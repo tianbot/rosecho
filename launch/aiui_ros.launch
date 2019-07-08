@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="serial_port" default="/dev/ttyS0" />
+  <node pkg="aiui_ros" type="aiui_ros_node" name="aiui_ros" respawn = "true" >
+    <param name="serial_port" type="string" value="$(arg serial_port)"/>
+  </node>
+</launch>
