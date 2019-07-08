@@ -8,38 +8,44 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <boost/bind.hpp>
 
-#define DBG_LOG_TRACE(format, ...)                                             \
-    printf(format, ##__VA_ARGS__);                                             \
+#define DBG_LOG_TRACE(format, ...) \
+    printf(format, ##__VA_ARGS__); \
     printf("\n")
-#define DBG_LOG_DEBUG(format, ...)                                             \
-    printf(format, ##__VA_ARGS__);                                             \
+#define DBG_LOG_DEBUG(format, ...) \
+    printf(format, ##__VA_ARGS__); \
     printf("\n")
-#define DBG_LOG_ERROR(format, ...)                                             \
-    printf(format, ##__VA_ARGS__);                                             \
+#define DBG_LOG_ERROR(format, ...) \
+    printf(format, ##__VA_ARGS__); \
     printf("\n")
-#define DBG_LOG_WARNING(format, ...)                                           \
-    printf(format, ##__VA_ARGS__);                                             \
+#define DBG_LOG_WARNING(format, ...) \
+    printf(format, ##__VA_ARGS__);   \
     printf("\n")
 
-static void *serial_recv(void *arg) {
+static void *serial_recv(void *param)
+{
+    struct thread_param *p = (struct thread_param *)param;
     uint8_t recvbuff[1024];
     int recvlen = 0;
-    Serial *p = (Serial *)arg;
-    while (p->running) {
+    Serial *pThis = (Serial *)p->param1;
+    while (pThis->running)
+    {
         memset(recvbuff, 0, sizeof(recvbuff));
 
-        if ((recvlen = read(p->fd, recvbuff, sizeof(recvbuff))) == -1) {
+        if ((recvlen = read(pThis->fd, recvbuff, sizeof(recvbuff))) == -1)
+        {
             DBG_LOG_ERROR("uart_recv error:%d", errno);
             continue;
         }
-        p->recv_cb(recvbuff, recvlen);
+        pThis->recv_cb(recvbuff, recvlen, p->param2);
     }
     return NULL;
 }
 
 bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
-                    int parity) {
+                    int parity)
+{
     int i;
     int status;
     int speed_arr[] = {B115200, B57600, B38400, B19200, B9600};
@@ -48,14 +54,17 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
     struct termios options;
 
     //获取设备属性信息
-    if (tcgetattr(fd, &options) != 0) {
+    if (tcgetattr(fd, &options) != 0)
+    {
         perror("SetupSerial");
         return false;
     }
 
     //设置串口输入波特率和输出波特率 /i o 入和出
-    for (i = 0; i < sizeof(speed_arr) / sizeof(int); i++) {
-        if (speed == name_arr[i]) {
+    for (i = 0; i < sizeof(speed_arr) / sizeof(int); i++)
+    {
+        if (speed == name_arr[i])
+        {
             cfsetispeed(&options, speed_arr[i]);
             cfsetospeed(&options, speed_arr[i]);
         }
@@ -67,7 +76,8 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
     options.c_cflag |= CREAD;
 
     //设置数据流控制
-    switch (flow_ctrl) {
+    switch (flow_ctrl)
+    {
     case 0: //不使用流控制
         options.c_cflag &= ~CRTSCTS;
         break;
@@ -83,7 +93,8 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
     }
     //设置数据位
     options.c_cflag &= ~CSIZE; //屏蔽其他标志位
-    switch (databits) {
+    switch (databits)
+    {
     case 5:
         options.c_cflag |= CS5;
         break;
@@ -101,7 +112,8 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
         return false;
     }
     //设置校验位
-    switch (parity) {
+    switch (parity)
+    {
     case 'n':
     case 'N': //无奇偶校验位。
         options.c_cflag &= ~PARENB;
@@ -128,7 +140,8 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
         return false;
     }
     // 设置停止位
-    switch (stopbits) {
+    switch (stopbits)
+    {
     case 1:
         options.c_cflag &= ~CSTOPB;
         break;
@@ -154,7 +167,8 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
     tcflush(fd, TCIFLUSH);
 
     //激活配置 (将修改后的termios数据设置到串口中）
-    if (tcsetattr(fd, TCSANOW, &options) != 0) {
+    if (tcsetattr(fd, TCSANOW, &options) != 0)
+    {
         perror("com set error!/n");
         return false;
     }
@@ -162,12 +176,16 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
 }
 
 bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
-                  int stopbits, int parity, serial_recv_cb cb) {
+                  int stopbits, int parity, serial_recv_cb cb, void* param)
+{
     int ret;
     pthread_attr_t attr;
+    struct thread_param tparam = {this, param};
+    recv_thread = 0;
     DBG_LOG_TRACE("open serial %s start\n", device);
     //句柄检查
-    if (NULL == device || NULL == cb) {
+    if (NULL == device || NULL == cb)
+    {
         DBG_LOG_ERROR("NULL == device || NULL == recv_callback\n");
         return false;
     }
@@ -176,12 +194,14 @@ bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
 
     //打开设备
     fd = ::open(device, O_RDWR);
-    if (fd < 0) {
+    if (fd < 0)
+    {
         DBG_LOG_ERROR("open failed: %s\n", device);
         return false;
     }
     //设定属性
-    if (config(rate, flow_ctrl, databits, stopbits, parity) == false) {
+    if (config(rate, flow_ctrl, databits, stopbits, parity) == false)
+    {
         goto error;
     }
     running = 1;
@@ -189,8 +209,9 @@ bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
     //创建线程，接收数据
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //分离属性
-    ret = pthread_create(&recv_thread, &attr, serial_recv, this);
-    if (0 != ret) {
+    ret = pthread_create(&recv_thread, &attr, serial_recv, &tparam);
+    if (0 != ret)
+    {
         DBG_LOG_ERROR("uart recv thread create failed!\n");
         goto error;
     }
@@ -200,28 +221,34 @@ bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
 
 error:
     running = 0;
-    if (fd > 0) {
+    if (fd > 0)
+    {
         ::close(fd);
     }
-    if (NULL != recv_thread) {
+    if (0 != recv_thread)
+    {
         pthread_join(recv_thread, NULL);
     }
     return false;
 }
 
-int Serial::send(uint8_t *data, int len) {
+int Serial::send(uint8_t *data, int len)
+{
     int ret = 0;
     int sended_len = 0;
 
-    if (fd <= 0) {
+    if (fd <= 0)
+    {
         return -1;
     }
 
     //反复发送，直到全部发完
-    while (sended_len != len) {
+    while (sended_len != len)
+    {
         int retlen = 0;
         retlen = write(fd, data + sended_len, len - sended_len);
-        if (retlen < 0) {
+        if (retlen < 0)
+        {
             DBG_LOG_ERROR("serial send failed! ret=%d\n", ret);
             return -1;
         }
@@ -231,12 +258,15 @@ int Serial::send(uint8_t *data, int len) {
     return ret;
 }
 
-void Serial::close(void) {
+void Serial::close(void)
+{
     running = 0;
-    if (fd > 0) {
+    if (fd > 0)
+    {
         ::close(fd);
     }
-    if (NULL != recv_thread) {
+    if (0 != recv_thread)
+    {
         pthread_join(recv_thread, NULL);
     }
 }

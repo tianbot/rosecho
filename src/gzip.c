@@ -3,11 +3,13 @@
 
 /* Compress gzip data */
 /* data 原数据 ndata 原数据长度 zdata 压缩后数据 nzdata 压缩后长度 */
-int gzcompress(Bytef *data, uLong ndata, Bytef *zdata, uLong *nzdata) {
+int gzcompress(Bytef *data, uLong ndata, Bytef *zdata, uLong *nzdata)
+{
     z_stream c_stream;
     int err = 0;
 
-    if (data && ndata > 0) {
+    if (data && ndata > 0)
+    {
         c_stream.zalloc = NULL;
         c_stream.zfree = NULL;
         c_stream.opaque = NULL;
@@ -19,13 +21,15 @@ int gzcompress(Bytef *data, uLong ndata, Bytef *zdata, uLong *nzdata) {
         c_stream.avail_in = ndata;
         c_stream.next_out = zdata;
         c_stream.avail_out = *nzdata;
-        while (c_stream.avail_in != 0 && c_stream.total_out < *nzdata) {
+        while (c_stream.avail_in != 0 && c_stream.total_out < *nzdata)
+        {
             if (deflate(&c_stream, Z_NO_FLUSH) != Z_OK)
                 return -1;
         }
         if (c_stream.avail_in != 0)
             return c_stream.avail_in;
-        for (;;) {
+        for (;;)
+        {
             if ((err = deflate(&c_stream, Z_FINISH)) == Z_STREAM_END)
                 break;
             if (err != Z_OK)
@@ -41,7 +45,8 @@ int gzcompress(Bytef *data, uLong ndata, Bytef *zdata, uLong *nzdata) {
 
 /* Uncompress gzip data */
 /* zdata 数据 nzdata 原数据长度 data 解压后数据 ndata 解压后长度 */
-int gzdecompress(Byte *zdata, uLong nzdata, Byte *data, uLong *ndata) {
+int gzdecompress(Byte *zdata, uLong nzdata, Byte *data, uLong *ndata)
+{
     int err = 0;
     z_stream d_stream = {0}; /* decompression stream */
     static char dummy_head[2] = {
@@ -58,18 +63,23 @@ int gzdecompress(Byte *zdata, uLong nzdata, Byte *data, uLong *ndata) {
     if (inflateInit2(&d_stream, MAX_WBITS + 16) != Z_OK)
         return -1;
     // if(inflateInit2(&d_stream, 47) != Z_OK) return -1;
-    while (d_stream.total_out < *ndata && d_stream.total_in < nzdata) {
+    while (d_stream.total_out < *ndata && d_stream.total_in < nzdata)
+    {
         d_stream.avail_in = d_stream.avail_out = 1; /* force small buffers */
         if ((err = inflate(&d_stream, Z_NO_FLUSH)) == Z_STREAM_END)
             break;
-        if (err != Z_OK) {
-            if (err == Z_DATA_ERROR) {
+        if (err != Z_OK)
+        {
+            if (err == Z_DATA_ERROR)
+            {
                 d_stream.next_in = (Bytef *)dummy_head;
                 d_stream.avail_in = sizeof(dummy_head);
-                if ((err = inflate(&d_stream, Z_NO_FLUSH)) != Z_OK) {
+                if ((err = inflate(&d_stream, Z_NO_FLUSH)) != Z_OK)
+                {
                     return -1;
                 }
-            } else
+            }
+            else
                 return -1;
         }
     }
