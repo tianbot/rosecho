@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="serial_port" default="/dev/ttyUSB0" />
+  <node pkg="rosecho" type="rosecho_node" name="rosecho" output="screen">
+    <param name="serial_port" type="string" value="$(arg serial_port)"/>
+  </node>
+</launch>
