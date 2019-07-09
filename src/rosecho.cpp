@@ -68,7 +68,7 @@ Rosecho::Rosecho(void)
 
     ack();
 
-    asr_pub = n.advertise<std_msgs::String>("/rosecho/aiui_asr", 1000);
+    asr_pub = n.advertise<std_msgs::String>("/rosecho/asr", 1000);
     status_pub = n.advertise<std_msgs::String>("/rosecho/status", 1000);
     wakeup_pos_pub = n.advertise<std_msgs::Int16>("/rosecho/wakeup_pos", 1000);
     tts_sub = n.subscribe("/rosecho/tts", 1000, &Rosecho::tts_cb, this);
