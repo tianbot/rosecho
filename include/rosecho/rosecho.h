@@ -20,7 +20,7 @@
 #define SYNC_HEAD 0xa5
 #define SYNC_HEAD_SECOND 0x01
 
-#define DEFAULT_SERIAL_DEVICE "/dev/ttyS4"
+#define DEFAULT_SERIAL_DEVICE "/dev/ttyUSB0"
 #define DEFAULT_WIFI_SSID "TianbotOffice"
 #define DEFAULT_WIFI_PASSWORD "www.tianbot.com"
 
@@ -29,26 +29,27 @@ class Rosecho
 public:
   void tts(uint8_t flag, const char *str, const char *emot);
   void cfg(const char *config);
-  void wifi_status(void);
-  static void serial_data_proc(uint8_t *data, unsigned int data_len, void *param);
+  void checkWifiStatus(void);
+  static void serialDataProc(uint8_t *data, unsigned int data_len, void *param);
   Rosecho(void);
 
 private:
-  Serial serial;
-  void wifi_cfg(const char *ssid, const char *password, uint8_t mode);
+  void wifiCfg(const char *ssid, const char *password, uint8_t mode);
   void ack(void);
-  void tts_cb(const std_msgs::String::ConstPtr &msg);
-  void cfg_cb(const std_msgs::String::ConstPtr &msg);
-  void rosecho_data_proc(unsigned char *buf, int len);
-  std::string param_ssid;
-  std::string param_password;
-  std::string param_serial_port;
-  ros::Publisher asr_pub;
-  ros::Publisher status_pub;
-  ros::Publisher wakeup_pos_pub;
-  ros::Subscriber tts_sub;
-  ros::Subscriber cfg_sub;
-  uint16_t id;
+  void ttsCallback(const std_msgs::String::ConstPtr &msg);
+  void cfgCallback(const std_msgs::String::ConstPtr &msg);
+  void rosechoDataProc(unsigned char *buf, int len);
+  std::string param_ssid_;
+  std::string param_password_;
+  std::string param_serial_port_;
+  ros::Publisher asr_pub_;
+  ros::Publisher status_pub_;
+  ros::Publisher wakeup_pos_pub_;
+  ros::Subscriber tts_sub_;
+  ros::Subscriber cfg_sub_;
+  ros::NodeHandle nh_;
+  uint16_t id_;
+  Serial serial_;
 };
 
 #endif

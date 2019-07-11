@@ -39,28 +39,28 @@
 #include <sstream>
 #include <stdlib.h>
 
-void Rosecho::tts_cb(const std_msgs::String::ConstPtr &msg)
+void Rosecho::ttsCallback(const std_msgs::String::ConstPtr &msg)
 {
     tts(1, (char *)(msg->data.c_str()), "happy");
 }
 
-void Rosecho::cfg_cb(const std_msgs::String::ConstPtr &msg)
+void Rosecho::cfgCallback(const std_msgs::String::ConstPtr &msg)
 {
     cfg((char *)msg->data.c_str());
 }
 
 Rosecho::Rosecho(void)
 {
-    ros::NodeHandle n("rosecho");
+    nh_ = ros::NodeHandle("rosecho");
 
-    n.param<std::string>("serial_port", param_serial_port,
+    nh_.param<std::string>("serial_port", param_serial_port_,
                          DEFAULT_SERIAL_DEVICE);
-    n.param<std::string>("wifi_ssid", param_ssid, DEFAULT_WIFI_SSID);
-    n.param<std::string>("wifi_password", param_password,
+    nh_.param<std::string>("wifi_ssid", param_ssid_, DEFAULT_WIFI_SSID);
+    nh_.param<std::string>("wifi_password", param_password_,
                          DEFAULT_WIFI_PASSWORD);
 
-    if (serial.open(param_serial_port.c_str(), 115200, 0, 8, 1, 'N',
-                    serial_data_proc, this) != true)
+    if (serial_.open(param_serial_port_.c_str(), 115200, 0, 8, 1, 'N',
+                    serialDataProc, this) != true)
     {
         ROS_ERROR("serial error\n");
         exit(-1);
@@ -68,14 +68,14 @@ Rosecho::Rosecho(void)
 
     ack();
 
-    asr_pub = n.advertise<std_msgs::String>("/rosecho/asr", 1000);
-    status_pub = n.advertise<std_msgs::String>("/rosecho/status", 1000);
-    wakeup_pos_pub = n.advertise<std_msgs::Int16>("/rosecho/wakeup_pos", 1000);
-    tts_sub = n.subscribe("/rosecho/tts", 1000, &Rosecho::tts_cb, this);
-    cfg_sub = n.subscribe("/rosecho/cfg", 1000, &Rosecho::cfg_cb, this);
+    asr_pub_ = nh_.advertise<std_msgs::String>("/rosecho/asr", 1000);
+    status_pub_ = nh_.advertise<std_msgs::String>("/rosecho/status", 1000);
+    wakeup_pos_pub_ = nh_.advertise<std_msgs::Int16>("/rosecho/wakeup_pos", 1000);
+    tts_sub_ = nh_.subscribe("/rosecho/tts", 1000, &Rosecho::ttsCallback, this);
+    cfg_sub_ = nh_.subscribe("/rosecho/cfg", 1000, &Rosecho::cfgCallback, this);
 }
 
-void Rosecho::wifi_cfg(const char *ssid, const char *password, uint8_t mode)
+void Rosecho::wifiCfg(const char *ssid, const char *password, uint8_t mode)
 {
     uint8_t buf[1024];
     uint16_t offset = 0;
@@ -86,7 +86,7 @@ void Rosecho::wifi_cfg(const char *ssid, const char *password, uint8_t mode)
 
     int i;
 
-    id++;
+    id_++;
 
     buf[offset++] = 0xA5;
     buf[offset++] = 0x01;
@@ -96,8 +96,8 @@ void Rosecho::wifi_cfg(const char *ssid, const char *password, uint8_t mode)
     buf[offset++] = len & 0xFF;
     buf[offset++] = (len >> 8) & 0xFF;
 
-    buf[offset++] = id & 0xFF;
-    buf[offset++] = (id >> 8) & 0xFF;
+    buf[offset++] = id_ & 0xFF;
+    buf[offset++] = (id_ >> 8) & 0xFF;
 
     buf[offset++] = 0x00;
     buf[offset++] = mode;
@@ -122,10 +122,10 @@ void Rosecho::wifi_cfg(const char *ssid, const char *password, uint8_t mode)
 
     buf[offset++] = checksum;
 
-    serial.send(buf, offset);
+    serial_.send(buf, offset);
 }
 
-void Rosecho::wifi_status(void)
+void Rosecho::checkWifiStatus(void)
 {
     cJSON *root, *content;
     uint16_t len;
@@ -137,7 +137,7 @@ void Rosecho::wifi_status(void)
 
     int i;
 
-    id++;
+    id_++;
 
     buf[offset++] = 0xA5;
     buf[offset++] = 0x01;
@@ -146,8 +146,8 @@ void Rosecho::wifi_status(void)
 
     offset += 2;
 
-    buf[offset++] = id & 0xFF;
-    buf[offset++] = (id >> 8) & 0xFF;
+    buf[offset++] = id_ & 0xFF;
+    buf[offset++] = (id_ >> 8) & 0xFF;
 
     root = cJSON_CreateObject();
 
@@ -178,7 +178,7 @@ void Rosecho::wifi_status(void)
 
     buf[offset++] = checksum;
 
-    serial.send(buf, offset);
+    serial_.send(buf, offset);
 }
 
 // emot is not used by iflytek now
@@ -194,7 +194,7 @@ void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
 
     int i;
 
-    id++;
+    id_++;
 
     buf[offset++] = 0xA5;
     buf[offset++] = 0x01;
@@ -203,8 +203,8 @@ void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
 
     offset += 2;
 
-    buf[offset++] = id & 0xFF;
-    buf[offset++] = (id >> 8) & 0xFF;
+    buf[offset++] = id_ & 0xFF;
+    buf[offset++] = (id_ >> 8) & 0xFF;
 
     root = cJSON_CreateObject();
 
@@ -246,7 +246,7 @@ void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
 
     buf[offset++] = checksum;
 
-    serial.send(buf, offset);
+    serial_.send(buf, offset);
 }
 
 void Rosecho::cfg(const char *config)
@@ -263,16 +263,16 @@ void Rosecho::cfg(const char *config)
 
     if (strcmp("wifi", config) == 0)
     {
-        wifi_cfg(param_ssid.c_str(), param_password.c_str(), WPA);
+        wifiCfg(param_ssid_.c_str(), param_password_.c_str(), WPA);
         return;
     }
     else if (strcmp("wifi_status", config) == 0)
     {
-        wifi_status();
+        checkWifiStatus();
         return;
     }
 
-    id++;
+    id_++;
 
     buf[offset++] = 0xA5;
     buf[offset++] = 0x01;
@@ -281,8 +281,8 @@ void Rosecho::cfg(const char *config)
 
     offset += 2;
 
-    buf[offset++] = id & 0xFF;
-    buf[offset++] = (id >> 8) & 0xFF;
+    buf[offset++] = id_ & 0xFF;
+    buf[offset++] = (id_ >> 8) & 0xFF;
 
     root = cJSON_CreateObject();
 
@@ -335,7 +335,7 @@ void Rosecho::cfg(const char *config)
 
     buf[offset++] = checksum;
 
-    serial.send(buf, offset);
+    serial_.send(buf, offset);
 }
 
 void Rosecho::ack(void)
@@ -344,17 +344,17 @@ void Rosecho::ack(void)
     uint8_t ack_buf[12];
     ack_buf[0] = 0xA5;
     ack_buf[1] = 0x01;
-    ack_buf[2] = 0xff; // 0xff是确认消息类型
+    ack_buf[2] = 0xff; // 0xff confirm msg type
     ack_buf[3] = 0x04;
     ack_buf[4] = 0x00;
-    ack_buf[5] = id & 0xff; // 消息ID同要收到消息ID相同
-    ack_buf[6] = (id >> 8) & 0xFF;
+    ack_buf[5] = id_ & 0xff; // Msg ID should be the same as recv msg
+    ack_buf[6] = (id_ >> 8) & 0xFF;
     ack_buf[7] = 0xA5;
     ack_buf[8] = 0x00;
     ack_buf[9] = 0x00;
     ack_buf[10] = 0x00;
 
-    //计算校检码
+    //checksum
     char check_code = 0;
     for (i = 0; i <= 10; i++)
     {
@@ -362,22 +362,22 @@ void Rosecho::ack(void)
     }
     check_code = ~check_code + 1;
     ack_buf[11] = check_code;
-    serial.send(ack_buf, sizeof(ack_buf));
+    serial_.send(ack_buf, sizeof(ack_buf));
 }
 
-void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
+void Rosecho::rosechoDataProc(unsigned char *buf, int len)
 {
     int i;
     if (buf[2] == 0xff)
     {
-        //对确认消息先不处理
+        //Do nothing
         return;
     }
 
     unsigned char unzip_buf[100 * 1024];
     int unzip_len = sizeof(unzip_buf);
 
-    id = buf[5] + buf[6] * 256;
+    id_ = buf[5] + buf[6] * 256;
     ack();
 
     if (buf[2] != 0x04)
@@ -391,7 +391,6 @@ void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
         ROS_ERROR("gzip error\n");
         return;
     }
-
     unzip_buf[unzip_len] = '\0';
     cJSON *json, *p;
     char key[4][10] = {"content", "result", "intent", "text"};
@@ -418,7 +417,8 @@ void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
             char *out = cJSON_Print(p);
             std_msgs::String asr_msg;
             asr_msg.data = out;
-            asr_pub.publish(asr_msg);
+            ROS_DEBUG("%s\n",asr_msg.data.c_str());
+            asr_pub_.publish(asr_msg);
             free(out);
         }
 
@@ -437,13 +437,13 @@ void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
                         {
                             std_msgs::String status_msg;
                             status_msg.data = "tts:start";
-                            status_pub.publish(status_msg);
+                            status_pub_.publish(status_msg);
                         }
                         else
                         {
                             std_msgs::String status_msg;
                             status_msg.data = "tts:end";
-                            status_pub.publish(status_msg);
+                            status_pub_.publish(status_msg);
                         }
                     }
                 }
@@ -461,7 +461,7 @@ void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
                         {
                             std_msgs::String status_msg;
                             status_msg.data = "state:sleep";
-                            status_pub.publish(status_msg);
+                            status_pub_.publish(status_msg);
                         }
                         else if (q->valueint == 4) // wakeup event
                         {
@@ -473,7 +473,7 @@ void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
                                 {
                                     std_msgs::Int16 wakeup_pos_msg;
                                     wakeup_pos_msg.data = q->valueint;
-                                    wakeup_pos_pub.publish(wakeup_pos_msg);
+                                    wakeup_pos_pub_.publish(wakeup_pos_msg);
                                 }
                             }
                         }
@@ -493,7 +493,7 @@ void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
                         {
                             std_msgs::String status_msg;
                             status_msg.data = "wifi:false";
-                            status_pub.publish(status_msg);
+                            status_pub_.publish(status_msg);
                         }
                         else if (q->type == cJSON_True)
                         {
@@ -504,7 +504,7 @@ void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
                             {
                                 status_msg.data += q->valuestring;
                             }
-                            status_pub.publish(status_msg);
+                            status_pub_.publish(status_msg);
                         }
                     }
                 }
@@ -515,7 +515,7 @@ void Rosecho::rosecho_data_proc(unsigned char *buf, int len)
     }
 }
 
-void Rosecho::serial_data_proc(uint8_t *data, unsigned int data_len, void *param)
+void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
 {
     Rosecho *pThis = (Rosecho *)param;
     static uint8_t state = 0;
@@ -618,7 +618,7 @@ void Rosecho::serial_data_proc(uint8_t *data, unsigned int data_len, void *param
                 crc = (~crc) + 1;
                 if (crc == recv_msg[recv_msg_len - 1])
                 {
-                    pThis->rosecho_data_proc(recv_msg, recv_msg_len); //接受消息处理
+                    pThis->rosechoDataProc(recv_msg, recv_msg_len); // process recv msg
                 }
                 else
                 {

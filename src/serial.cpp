@@ -211,7 +211,7 @@ bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
 {
     int ret;
     pthread_attr_t attr;
-    struct thread_param tparam = {this, param};
+    static struct thread_param tparam = {this, param};
     recv_thread = 0;
     DBG_LOG_TRACE("open serial %s start\n", device);
     //句柄检查
