@@ -38,6 +38,7 @@
 #include "std_msgs/String.h"
 #include <sstream>
 #include <stdlib.h>
+#include <vector>
 
 void Rosecho::ttsCallback(const std_msgs::String::ConstPtr &msg)
 {
@@ -77,8 +78,7 @@ Rosecho::Rosecho(void)
 
 void Rosecho::wifiCfg(const char *ssid, const char *password, uint8_t mode)
 {
-    uint8_t buf[1024];
-    uint16_t offset = 0;
+    vector<uint8_t> buf;
 
     uint16_t len = strlen(ssid) + strlen(password) + 4;
 
@@ -88,30 +88,31 @@ void Rosecho::wifiCfg(const char *ssid, const char *password, uint8_t mode)
 
     id_++;
 
-    buf[offset++] = 0xA5;
-    buf[offset++] = 0x01;
+    buf.push_back(0xA5);
+    buf.push_back(0xA5);
+    buf.push_back(0x01);
 
-    buf[offset++] = 0x02;
+    buf.push_back(0x02);
 
-    buf[offset++] = len & 0xFF;
-    buf[offset++] = (len >> 8) & 0xFF;
+    buf.push_back(len & 0xFF);
+    buf.push_back((len >> 8) & 0xFF);
 
-    buf[offset++] = id_ & 0xFF;
-    buf[offset++] = (id_ >> 8) & 0xFF;
+    buf.push_back(id_ & 0xFF);
+    buf.push_back((id_ >> 8) & 0xFF);
 
-    buf[offset++] = 0x00;
-    buf[offset++] = mode;
-    buf[offset++] = strlen(ssid);
-    buf[offset++] = strlen(password);
+    buf.push_back(0x00);
+    buf.push_back(mode);
+    buf.push_back(strlen(ssid));
+    buf.push_back(strlen(password));
 
     for (i = 0; i < strlen(ssid); i++)
     {
-        buf[offset++] = ssid[i];
+        buf.push_back(ssid[i]);
     }
 
     for (i = 0; i < strlen(password); i++)
     {
-        buf[offset++] = password[i];
+        buf.push_back(password[i]);
     }
 
     for (i = 0; i < offset; i++)
@@ -120,17 +121,17 @@ void Rosecho::wifiCfg(const char *ssid, const char *password, uint8_t mode)
     }
     checksum = (~checksum) + 1;
 
-    buf[offset++] = checksum;
+    buf.push_back(checksum);
 
-    serial_.send(buf, offset);
+    serial_.send(&buf[0], buf.size());
+    buf.clear();
 }
 
 void Rosecho::checkWifiStatus(void)
 {
     cJSON *root, *content;
     uint16_t len;
-    uint8_t buf[1024];
-    uint16_t offset = 0;
+    vector<uint8_t> buf;
     char *out;
 
     uint8_t checksum = 0;
@@ -139,15 +140,10 @@ void Rosecho::checkWifiStatus(void)
 
     id_++;
 
-    buf[offset++] = 0xA5;
-    buf[offset++] = 0x01;
+    buf.push_back(0xA5);
+    buf.push_back(0x01);
 
-    buf[offset++] = 0x05;
-
-    offset += 2;
-
-    buf[offset++] = id_ & 0xFF;
-    buf[offset++] = (id_ >> 8) & 0xFF;
+    buf.push_back(0x05);
 
     root = cJSON_CreateObject();
 
@@ -160,12 +156,15 @@ void Rosecho::checkWifiStatus(void)
     cJSON_Delete(root);
     len = strlen(out);
 
-    buf[3] = len & 0xFF;
-    buf[4] = (len >> 8) & 0xFF;
+    buf.push_back(len & 0xFF);
+    buf.push_back((len >> 8) & 0xFF);
+
+    buf.push_back(id_ & 0xFF);
+    buf.push_back((id_ >> 8) & 0xFF);
 
     for (i = 0; i < len; i++)
     {
-        buf[offset++] = out[i];
+        buf.push_back(out[i]);
     }
 
     free(out);
@@ -176,9 +175,10 @@ void Rosecho::checkWifiStatus(void)
     }
     checksum = (~checksum) + 1;
 
-    buf[offset++] = checksum;
+    buf.push_back(checksum);
 
-    serial_.send(buf, offset);
+    serial_.send(&buf[0], buf.size());
+    buf.clear();
 }
 
 // emot is not used by iflytek now
@@ -186,8 +186,7 @@ void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
 {
     cJSON *root, *content, *parameters;
     uint16_t len;
-    uint8_t buf[8192];
-    uint16_t offset = 0;
+    vector<uint8_t> buf;
     char *out;
 
     uint8_t checksum = 0;
@@ -196,15 +195,10 @@ void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
 
     id_++;
 
-    buf[offset++] = 0xA5;
-    buf[offset++] = 0x01;
+    buf.push_back(0xA5);
+    buf.push_back(0x01);
 
-    buf[offset++] = 0x05;
-
-    offset += 2;
-
-    buf[offset++] = id_ & 0xFF;
-    buf[offset++] = (id_ >> 8) & 0xFF;
+    buf.push_back(0x05);
 
     root = cJSON_CreateObject();
 
@@ -228,12 +222,15 @@ void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
     cJSON_Delete(root);
     len = strlen(out);
 
-    buf[3] = len & 0xFF;
-    buf[4] = (len >> 8) & 0xFF;
+    buf.push_back(len & 0xFF);
+    buf.push_back((len >> 8) & 0xFF);
+
+    buf.push_back(id_ & 0xFF);
+    buf.push_back((id_ >> 8) & 0xFF);
 
     for (i = 0; i < len; i++)
     {
-        buf[offset++] = out[i];
+        buf.push_back(out[i]);
     }
 
     free(out);
@@ -244,17 +241,17 @@ void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
     }
     checksum = (~checksum) + 1;
 
-    buf[offset++] = checksum;
+    buf.push_back(checksum);
 
-    serial_.send(buf, offset);
+    serial_.send(&buf[0], buf.size());
+    buf.clear();
 }
 
 void Rosecho::cfg(const char *config)
 {
     cJSON *root, *content;
     uint16_t len;
-    uint8_t buf[1024];
-    uint16_t offset = 0;
+    vector<uint8_t> buf;
     char *out;
 
     uint8_t checksum = 0;
@@ -274,15 +271,10 @@ void Rosecho::cfg(const char *config)
 
     id_++;
 
-    buf[offset++] = 0xA5;
-    buf[offset++] = 0x01;
+    buf.push_back(0xA5);
+    buf.push_back(0x01);
 
-    buf[offset++] = 0x05;
-
-    offset += 2;
-
-    buf[offset++] = id_ & 0xFF;
-    buf[offset++] = (id_ >> 8) & 0xFF;
+    buf.push_back(0x05);
 
     root = cJSON_CreateObject();
 
@@ -317,12 +309,15 @@ void Rosecho::cfg(const char *config)
     cJSON_Delete(root);
     len = strlen(out);
 
-    buf[3] = len & 0xFF;
-    buf[4] = (len >> 8) & 0xFF;
+    buf.push_back(len & 0xFF);
+    buf.push_back((len >> 8) & 0xFF);
+
+    buf.push_back(id_ & 0xFF);
+    buf.push_back((id_ >> 8) & 0xFF);
 
     for (i = 0; i < len; i++)
     {
-        buf[offset++] = out[i];
+        buf.push_back(out[i]);
     }
 
     free(out);
@@ -333,36 +328,39 @@ void Rosecho::cfg(const char *config)
     }
     checksum = (~checksum) + 1;
 
-    buf[offset++] = checksum;
+    buf.push_back(checksum);
 
-    serial_.send(buf, offset);
+    serial_.send(&buf[0], buf.size());
+    buf.clear();
 }
 
 void Rosecho::ack(void)
 {
     int i;
-    uint8_t ack_buf[12];
-    ack_buf[0] = 0xA5;
-    ack_buf[1] = 0x01;
-    ack_buf[2] = 0xff; // 0xff confirm msg type
-    ack_buf[3] = 0x04;
-    ack_buf[4] = 0x00;
-    ack_buf[5] = id_ & 0xff; // Msg ID should be the same as recv msg
-    ack_buf[6] = (id_ >> 8) & 0xFF;
-    ack_buf[7] = 0xA5;
-    ack_buf[8] = 0x00;
-    ack_buf[9] = 0x00;
-    ack_buf[10] = 0x00;
+    uint8_t checksum = 0;
+    vector<uint8_t> buf;
+    buf.push_back(0xA5);
+    buf.push_back(0x01);
+    buf.push_back(0xff); // 0xff confirm msg type
+    buf.push_back(0x04);
+    buf.push_back(0x00);
+    buf.push_back(id_ & 0xff); // Msg ID should be the same as recv msg
+    buf.push_back((id_ >> 8) & 0xFF);
+    buf.push_back(0xA5);
+    buf.push_back(0x00);
+    buf.push_back(0x00);
+    buf.push_back(0x00);
 
     //checksum
-    char check_code = 0;
     for (i = 0; i <= 10; i++)
     {
-        check_code += ack_buf[i];
+        checksum += buf[i];
     }
-    check_code = ~check_code + 1;
-    ack_buf[11] = check_code;
-    serial_.send(ack_buf, sizeof(ack_buf));
+    checksum = ~checksum + 1;
+    buf.push_back(checksum);
+
+    serial_.send(&buf[0], buf.size());
+    buf.clear();
 }
 
 void Rosecho::rosechoDataProc(unsigned char *buf, int len)
@@ -520,8 +518,7 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
     Rosecho *pThis = (Rosecho *)param;
     static uint8_t state = 0;
     uint8_t *p = data;
-    static uint8_t recv_msg[10 * 1024];
-    static uint32_t recv_msg_len;
+    static vector<uint8_t> recv_msg;
     static uint32_t len;
     uint32_t j;
 
@@ -532,8 +529,8 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
         case 0:
             if (*p == SYNC_HEAD)
             {
-                recv_msg_len = 0;
-                recv_msg[recv_msg_len++] = SYNC_HEAD;
+                recv_msg.clear();
+                recv_msg.push_back(SYNC_HEAD);
                 state = 1;
             }
             p++;
@@ -543,7 +540,7 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
         case 1:
             if (*p == SYNC_HEAD_SECOND)
             {
-                recv_msg[recv_msg_len++] = SYNC_HEAD_SECOND;
+                recv_msg.push_back(SYNC_HEAD_SECOND);
                 p++;
                 data_len--;
                 state = 2;
@@ -555,14 +552,14 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
             break;
 
         case 2:
-            recv_msg[recv_msg_len++] = *p;
+            recv_msg.push_back(*p);
             p++;
             data_len--;
             state = 3;
             break;
 
         case 3: // len
-            recv_msg[recv_msg_len++] = *p;
+            recv_msg.push_back(*p);
             len = *p;
             p++;
             data_len--;
@@ -570,7 +567,7 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
             break;
 
         case 4: // len
-            recv_msg[recv_msg_len++] = *p;
+            recv_msg.push_back(*p);
             len += (*p) * 256;
             if (len > 1024 * 10)
             {
@@ -583,14 +580,14 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
             break;
 
         case 5: // id
-            recv_msg[recv_msg_len++] = *p;
+            recv_msg.push_back(*p);
             p++;
             data_len--;
             state = 6;
             break;
 
         case 6: // id
-            recv_msg[recv_msg_len++] = *p;
+            recv_msg.push_back(*p);
             p++;
             data_len--;
             state = 7;
@@ -599,7 +596,7 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
         case 7: //
             if (len--)
             {
-                recv_msg[recv_msg_len++] = *p;
+                recv_msg.push_back(*p);
                 p++;
                 data_len--;
             }
@@ -607,7 +604,7 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
             {
                 int i;
                 uint8_t crc = 0;
-                recv_msg[recv_msg_len++] = *p;
+                recv_msg.push_back(*p);
                 p++;
                 data_len--;
                 state = 0;
@@ -618,7 +615,7 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
                 crc = (~crc) + 1;
                 if (crc == recv_msg[recv_msg_len - 1])
                 {
-                    pThis->rosechoDataProc(recv_msg, recv_msg_len); // process recv msg
+                    pThis->rosechoDataProc(&recv_msg[0], recv_msg.size()); // process recv msg
                 }
                 else
                 {
