@@ -1,22 +1,22 @@
 // BSD 3-Clause License
-// 
+//
 // Copyright (c) 2019, TIANBOT
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this
 //    list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 //    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -28,7 +28,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 #include "rosecho.h"
 #include "cJSON.h"
 #include "gzip.h"
@@ -39,6 +38,8 @@
 #include <sstream>
 #include <stdlib.h>
 #include <vector>
+
+using namespace std;
 
 void Rosecho::ttsCallback(const std_msgs::String::ConstPtr &msg)
 {
@@ -55,13 +56,13 @@ Rosecho::Rosecho(void)
     nh_ = ros::NodeHandle("rosecho");
 
     nh_.param<std::string>("serial_port", param_serial_port_,
-                         DEFAULT_SERIAL_DEVICE);
+                           DEFAULT_SERIAL_DEVICE);
     nh_.param<std::string>("wifi_ssid", param_ssid_, DEFAULT_WIFI_SSID);
     nh_.param<std::string>("wifi_password", param_password_,
-                         DEFAULT_WIFI_PASSWORD);
+                           DEFAULT_WIFI_PASSWORD);
 
     if (serial_.open(param_serial_port_.c_str(), 115200, 0, 8, 1, 'N',
-                    serialDataProc, this) != true)
+                     serialDataProc, this) != true)
     {
         ROS_ERROR("serial error\n");
         exit(-1);
@@ -70,6 +71,7 @@ Rosecho::Rosecho(void)
     ack();
 
     asr_pub_ = nh_.advertise<std_msgs::String>("/rosecho/asr", 1000);
+    answer_pub_ = nh_.advertise<std_msgs::String>("/rosecho/answer", 1000);
     status_pub_ = nh_.advertise<std_msgs::String>("/rosecho/status", 1000);
     wakeup_pos_pub_ = nh_.advertise<std_msgs::Int16>("/rosecho/wakeup_pos", 1000);
     tts_sub_ = nh_.subscribe("/rosecho/tts", 1000, &Rosecho::ttsCallback, this);
@@ -115,7 +117,7 @@ void Rosecho::wifiCfg(const char *ssid, const char *password, uint8_t mode)
         buf.push_back(password[i]);
     }
 
-    for (i = 0; i < offset; i++)
+    for (i = 0; i < buf.size(); i++)
     {
         checksum += buf[i];
     }
@@ -169,7 +171,7 @@ void Rosecho::checkWifiStatus(void)
 
     free(out);
 
-    for (i = 0; i < offset; i++)
+    for (i = 0; i < buf.size(); i++)
     {
         checksum += buf[i];
     }
@@ -235,7 +237,7 @@ void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
 
     free(out);
 
-    for (i = 0; i < offset; i++)
+    for (i = 0; i < buf.size(); i++)
     {
         checksum += buf[i];
     }
@@ -322,7 +324,7 @@ void Rosecho::cfg(const char *config)
 
     free(out);
 
-    for (i = 0; i < offset; i++)
+    for (i = 0; i < buf.size(); i++)
     {
         checksum += buf[i];
     }
@@ -352,7 +354,7 @@ void Rosecho::ack(void)
     buf.push_back(0x00);
 
     //checksum
-    for (i = 0; i <= 10; i++)
+    for (i = 0; i < buf.size(); i++)
     {
         checksum += buf[i];
     }
@@ -391,7 +393,8 @@ void Rosecho::rosechoDataProc(unsigned char *buf, int len)
     }
     unzip_buf[unzip_len] = '\0';
     cJSON *json, *p;
-    char key[4][10] = {"content", "result", "intent", "text"};
+    char key_asr[4][10] = {"content", "result", "intent", "text"};
+    char key_answer[5][10] = {"content", "result", "intent", "answer", "text"};
     json = cJSON_Parse((const char *)unzip_buf);
     if (!json)
     {
@@ -404,7 +407,7 @@ void Rosecho::rosechoDataProc(unsigned char *buf, int len)
         p = json;
         for (i = 0; i < 4; i++)
         {
-            p = cJSON_GetObjectItem(p, key[i]);
+            p = cJSON_GetObjectItem(p, key_asr[i]);
             if (!p)
             {
                 break;
@@ -415,11 +418,29 @@ void Rosecho::rosechoDataProc(unsigned char *buf, int len)
             char *out = cJSON_Print(p);
             std_msgs::String asr_msg;
             asr_msg.data = out;
-            ROS_DEBUG("%s\n",asr_msg.data.c_str());
+            ROS_DEBUG("%s\n", asr_msg.data.c_str());
             asr_pub_.publish(asr_msg);
             free(out);
         }
 
+        p = json;
+        for (i = 0; i < 5; i++)
+        {
+            p = cJSON_GetObjectItem(p, key_answer[i]);
+            if (!p)
+            {
+                break;
+            }
+        }
+        if (i == 5)
+        {
+            char *out = cJSON_Print(p);
+            std_msgs::String answer_msg;
+            answer_msg.data = out;
+            ROS_DEBUG("%s\n", answer_msg.data.c_str());
+            answer_pub_.publish(answer_msg);
+            free(out);
+        }
         p = cJSON_GetObjectItem(json, "type");
         if (p)
         {
@@ -608,12 +629,12 @@ void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
                 p++;
                 data_len--;
                 state = 0;
-                for (i = 0; i < recv_msg_len - 1; i++)
+                for (i = 0; i < recv_msg.size() - 1; i++)
                 {
                     crc += recv_msg[i];
                 }
                 crc = (~crc) + 1;
-                if (crc == recv_msg[recv_msg_len - 1])
+                if (crc == recv_msg[recv_msg.size() - 1])
                 {
                     pThis->rosechoDataProc(&recv_msg[0], recv_msg.size()); // process recv msg
                 }

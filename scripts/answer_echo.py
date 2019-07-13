@@ -12,9 +12,9 @@ def listener():
     # anonymous=True flag means that rospy will choose a unique
     # name for our 'listener' node so that multiple listeners can
     # run simultaneously.
-    rospy.init_node('asr_echo', anonymous=True)
+    rospy.init_node('answer_echo', anonymous=True)
 
-    rospy.Subscriber('/rosecho/asr', String, callback)
+    rospy.Subscriber('/rosecho/answer', String, callback)
 
     # spin() simply keeps python from exiting until this node is stopped
     rospy.spin()
