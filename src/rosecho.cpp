@@ -491,7 +491,7 @@ void Rosecho::rosechoDataProc(unsigned char *buf, int len)
                                 if (q)
                                 {
                                     std_msgs::Int16 wakeup_pos_msg;
-                                    wakeup_pos_msg.data = q->valueint;
+                                    wakeup_pos_msg.data = 360 - q->valueint;
                                     wakeup_pos_pub_.publish(wakeup_pos_msg);
                                 }
                             }
