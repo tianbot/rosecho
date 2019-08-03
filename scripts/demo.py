@@ -1,5 +1,5 @@
 #!/usr/bin/env python  
-
+#coding=utf8
 import roslib
 
 import rospy  
@@ -30,7 +30,53 @@ class RosEchoNav():
             self.pose = data.pose.pose
         
     def asr_callback(self, data):
-        a = data
+        ros_msg = data.data.strip('"')
+        cmd = u"去端茶"
+        if not isinstance(ros_msg, unicode):
+            ros_msg = unicode(ros_msg, "utf8")
+        print(ros_msg)
+        print(len(ros_msg))
+        print(cmd)
+        print(len(cmd))
+        if cmd == ros_msg:
+            self.move_base.cancel_goal()
+    
+            goal = MoveBaseGoal()
+    
+            goal.target_pose.header.frame_id = 'map'
+    
+            goal.target_pose.header.stamp = rospy.Time.now()
+    
+    
+            goal.target_pose.pose.orientation.x = 0
+            goal.target_pose.pose.orientation.y = 0
+            goal.target_pose.pose.orientation.z = 0
+            goal.target_pose.pose.orientation.w = 1
+            goal.target_pose.pose.position.x = 2.134
+            goal.target_pose.pose.position.y = 7.17
+            goal.target_pose.pose.position.z = 0
+    
+            self.move(goal)
+
+        if ros_msg == u"回家":
+            self.move_base.cancel_goal()
+ 
+            goal = MoveBaseGoal()
+
+	    goal.target_pose.header.frame_id = 'map'
+ 
+            goal.target_pose.header.stamp = rospy.Time.now()
+ 
+            goal.target_pose.pose.orientation.x = 0
+            goal.target_pose.pose.orientation.y = 0
+            goal.target_pose.pose.orientation.z = 0
+            goal.target_pose.pose.orientation.w = 1
+            goal.target_pose.pose.position.x = 1.614
+            goal.target_pose.pose.position.y = 1.536
+            goal.target_pose.pose.position.z = 0
+ 
+            self.move(goal)
+
     
     def wakeup_callback(self, data):
 
