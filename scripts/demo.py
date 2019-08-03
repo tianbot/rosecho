@@ -124,6 +124,9 @@ class RosEchoNav():
 
         rospy.loginfo("Starting navigation test")  
 
+        #stop robot when exit
+        self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist)
+
         rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.pose_callback)
         rospy.Subscriber('/rosecho/wakeup_pos', Int16, self.wakeup_callback)
         rospy.Subscriber('/rosecho/asr', String, self.asr_callback)
@@ -159,15 +162,12 @@ class RosEchoNav():
 
         # Cancel any active goals  
 
-        self.move_base.cancel_goal()  
-
-        rospy.sleep(2)  
-
-        # Stop the robot  
+        self.move_base.cancel_goal()
+        rospy.sleep(2)
 
         self.cmd_vel_pub.publish(Twist())  
-
         rospy.sleep(1)
+
 
 if __name__ == '__main__':  
 
