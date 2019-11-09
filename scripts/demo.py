@@ -1,23 +1,14 @@
 #!/usr/bin/env python  
 #coding=utf8
 import roslib
-
 import rospy  
-
 import actionlib  
-
 from actionlib_msgs.msg import *  
-
 from geometry_msgs.msg import Pose, Point, Quaternion, Twist, PoseWithCovarianceStamped  
-
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal  
-
 from std_msgs.msg import Int16, String
-
 from nav_msgs.msg import Odometry
-
 from tf.transformations import quaternion_from_euler, euler_from_quaternion, quaternion_multiply
-
 from math import radians, pi  
 
 class RosEchoNav():  
@@ -34,19 +25,13 @@ class RosEchoNav():
         cmd = u"去端茶"
         if not isinstance(ros_msg, unicode):
             ros_msg = unicode(ros_msg, "utf8")
-        print(ros_msg)
-        print(len(ros_msg))
-        print(cmd)
-        print(len(cmd))
+
         if cmd == ros_msg:
             self.move_base.cancel_goal()
     
             goal = MoveBaseGoal()
-    
             goal.target_pose.header.frame_id = 'map'
-    
             goal.target_pose.header.stamp = rospy.Time.now()
-    
     
             goal.target_pose.pose.orientation.x = 0
             goal.target_pose.pose.orientation.y = 0
@@ -62,9 +47,7 @@ class RosEchoNav():
             self.move_base.cancel_goal()
  
             goal = MoveBaseGoal()
-
-	    goal.target_pose.header.frame_id = 'map'
- 
+    	    goal.target_pose.header.frame_id = 'map'
             goal.target_pose.header.stamp = rospy.Time.now()
  
             goal.target_pose.pose.orientation.x = 0
@@ -76,16 +59,12 @@ class RosEchoNav():
             goal.target_pose.pose.position.z = 0
  
             self.move(goal)
-
     
     def wakeup_callback(self, data):
-
         self.move_base.cancel_goal()
         
         goal = MoveBaseGoal()  
-
         goal.target_pose.header.frame_id = 'map'  
-
         goal.target_pose.header.stamp = rospy.Time.now()  
 
         q_orig = [self.pose.orientation.x, self.pose.orientation.y, self.pose.orientation.z, self.pose.orientation.w]
@@ -104,11 +83,9 @@ class RosEchoNav():
     def __init__(self):  
 
         self.pose_flag = 0
-
         self.pose = Pose()
         
         rospy.init_node('rosecho_nav', anonymous=False)  
-
         rospy.on_shutdown(self.shutdown)  
 
         # Subscribe to the move_base action server  
@@ -125,7 +102,7 @@ class RosEchoNav():
         rospy.loginfo("Starting navigation test")  
 
         #stop robot when exit
-        self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist)
+        self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=5)
 
         rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.pose_callback)
         rospy.Subscriber('/rosecho/wakeup_pos', Int16, self.wakeup_callback)
@@ -133,28 +110,19 @@ class RosEchoNav():
 
     def move(self, goal):  
 
-            # Send the goal pose to the MoveBaseAction server  
-            self.move_base.send_goal(goal)  
-
-            # Allow 1 minute to get there  
-            finished_within_time = self.move_base.wait_for_result(rospy.Duration(60))   
-
-            # If we don't get there in time, abort the goal  
-            if not finished_within_time:  
-
-                self.move_base.cancel_goal()  
-
-                rospy.loginfo("Timed out achieving goal")  
-
-            else:  
-
-                # We made it!  
-
-                state = self.move_base.get_state()  
-
-                if state == GoalStatus.SUCCEEDED:  
-
-                    rospy.loginfo("Goal succeeded!")  
+        # Send the goal pose to the MoveBaseAction server  
+        self.move_base.send_goal(goal)  
+        # Allow 1 minute to get there  
+        finished_within_time = self.move_base.wait_for_result(rospy.Duration(60))   
+        # If we don't get there in time, abort the goal  
+        if not finished_within_time:  
+            self.move_base.cancel_goal()  
+            rospy.loginfo("Timed out achieving goal")  
+        else:  
+            # We made it!  
+            state = self.move_base.get_state()  
+            if state == GoalStatus.SUCCEEDED:  
+                rospy.loginfo("Goal succeeded!")  
 
     def shutdown(self):  
 
