@@ -1,9 +1,11 @@
 # ROSECHO
+购买链接(Purchase link)：https://item.taobao.com/item.htm?id=607094712042
+
 ROSECHO的唤醒词为 “波弟波弟”。
 中文详细使用文档 doc.tianbot.com/rosecho
 
 ROS drivers and examples for Tianbot ROSECHO, a smart speaker converse in Chinese. 
-Wake word: Bodhi Bodhi
+Wake-up-word: Bodhi Bodhi
 
 ## Installation Instructions
 You can skip these steps if you purchase ROSECHO with a ROS2GO system 
@@ -51,8 +53,9 @@ rostopic pub /rosecho/tts std_msgs/String "data: '你好机器人'"
 Voice command test in turtlebot stage
 
 ```
-roslaunch turtlebot_stage turtlebot_in_stage.launch
 roslaunch rosecho rosecho.launch
+roslaunch turtlebot_stage turtlebot_in_stage.launch
+roslaunch rosecho demo.py
 ```
 
 
