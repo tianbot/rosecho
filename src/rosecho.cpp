@@ -91,7 +91,6 @@ void Rosecho::wifiCfg(const char *ssid, const char *password, uint8_t mode)
     id_++;
 
     buf.push_back(0xA5);
-    buf.push_back(0xA5);
     buf.push_back(0x01);
 
     buf.push_back(0x02);
