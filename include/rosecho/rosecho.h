@@ -32,12 +32,21 @@
 #define __ROSECHO_H__
 
 #include "ros/ros.h"
+#include "aiui.h"
 #include "serial.h"
 #include "std_msgs/Bool.h"
 #include "std_msgs/Int16.h"
 #include "std_msgs/String.h"
+#include "std_msgs/Int32.h"
+#include "rosecho/ttsAction.h"
+#include "actionlib/server/simple_action_server.h"
+#include "rosecho/WifiCfg.h"
+#include "std_srvs/Empty.h"
 #include "stdint.h"
-#include <stdio.h>
+
+using namespace std;
+
+#define BACKEND_AIUI
 
 #define OPEN 0
 #define WEP 1
@@ -54,33 +63,60 @@
 #define DEFAULT_WIFI_SSID "TianbotOffice"
 #define DEFAULT_WIFI_PASSWORD "www.tianbot.com"
 
+class Rosecho_tts
+{
+public:
+#ifdef BACKEND_AIUI
+    Rosecho_tts(ros::NodeHandle nh_, std::string name, Aiui *p);
+#else
+#error "No backend device defined"
+#endif
+    void ttsStartCallback(void);
+    void ttsFinishCallback(void);
+    void goalCB();
+    void preemptCB();
+
+protected:
+    actionlib::SimpleActionServer<rosecho::ttsAction> as_;
+    rosecho::ttsResult tts_result_;
+    std::string tts_text_;
+#ifdef BACKEND_AIUI
+    Aiui *backend_;
+#else
+#error "No backend device defined"
+#endif
+};
+
 class Rosecho
 {
 public:
-    void tts(uint8_t flag, const char *str, const char *emot);
-    void cfg(const char *config);
-    void checkWifiStatus(void);
-    static void serialDataProc(uint8_t *data, unsigned int data_len, void *param);
     Rosecho(void);
 
 private:
-    void wifiCfg(const char *ssid, const char *password, uint8_t mode);
-    void ack(void);
-    void ttsCallback(const std_msgs::String::ConstPtr &msg);
-    void cfgCallback(const std_msgs::String::ConstPtr &msg);
-    void rosechoDataProc(unsigned char *buf, int len);
-    std::string param_ssid_;
-    std::string param_password_;
-    std::string param_serial_port_;
     ros::Publisher asr_pub_;
     ros::Publisher answer_pub_;
-    ros::Publisher status_pub_;
     ros::Publisher wakeup_pos_pub_;
-    ros::Subscriber tts_sub_;
-    ros::Subscriber cfg_sub_;
     ros::NodeHandle nh_;
-    uint16_t id_;
-    Serial serial_;
+
+#ifdef BACKEND_AIUI
+    Aiui *backend_;
+#else
+#error "No backend device defined"
+#endif
+    Rosecho_tts *rosecho_tts_;
+    void answerCallback(string str);
+    void asrCallback(string str);
+    void wakeCallback(int angle);
+    void wifiConnectCallback(string str);
+    void wifiDisconnectCallback(void);
+    bool wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response &res);
+    bool enable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res);
+    bool disable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res);
+    bool wakeup(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res);
+    bool sleep(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res);
+
+    bool isWifiConnected_;
+    std::string ssid_;
 };
 
 #endif

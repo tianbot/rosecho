@@ -29,625 +29,157 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rosecho.h"
-#include "cJSON.h"
-#include "gzip.h"
-#include "serial.h"
-#include "std_msgs/Bool.h"
-#include "std_msgs/Int16.h"
-#include "std_msgs/String.h"
-#include <sstream>
-#include <stdlib.h>
-#include <vector>
 
+#ifdef BACKEND_AIUI
+#include "aiui.h"
+#else
+#error "No backend device defined"
+#endif
 using namespace std;
 
-void Rosecho::ttsCallback(const std_msgs::String::ConstPtr &msg)
+#ifdef BACKEND_AIUI
+Rosecho_tts::Rosecho_tts(ros::NodeHandle nh_, std::string name, Aiui *p) : as_(nh_, name, false), backend_(p)
+#else
+#error "No backend device defined"
+#endif
 {
-    tts(1, (char *)(msg->data.c_str()), "happy");
+    backend_->ttsFinishCallbackRegister(boost::bind(&Rosecho_tts::ttsFinishCallback, this));
+    backend_->ttsStartCallbackRegister(boost::bind(&Rosecho_tts::ttsStartCallback, this));
+    //register the goal and feeback callbacks
+    as_.registerGoalCallback(boost::bind(&Rosecho_tts::goalCB, this));
+    as_.registerPreemptCallback(boost::bind(&Rosecho_tts::preemptCB, this));
+    as_.start();
 }
 
-void Rosecho::cfgCallback(const std_msgs::String::ConstPtr &msg)
+void Rosecho_tts::ttsStartCallback(void)
 {
-    cfg((char *)msg->data.c_str());
+    tts_result_.is_finished = false;
+}
+
+void Rosecho_tts::ttsFinishCallback(void)
+{
+    tts_result_.is_finished = true;
+    as_.setSucceeded(tts_result_);
+}
+
+void Rosecho_tts::goalCB()
+{
+    tts_result_.is_finished = 0;
+    tts_text_ = as_.acceptNewGoal()->text;
+    backend_->tts(1, (char *)tts_text_.c_str(), "happy");
+}
+
+void Rosecho_tts::preemptCB()
+{
+    backend_->tts(0, NULL, NULL);
+    as_.setPreempted();
 }
 
 Rosecho::Rosecho(void)
 {
+    std::string param_serial_port;
     nh_ = ros::NodeHandle("rosecho");
 
-    nh_.param<std::string>("serial_port", param_serial_port_,
+    nh_.param<std::string>("serial_port", param_serial_port,
                            DEFAULT_SERIAL_DEVICE);
-    nh_.param<std::string>("wifi_ssid", param_ssid_, DEFAULT_WIFI_SSID);
-    nh_.param<std::string>("wifi_password", param_password_,
-                           DEFAULT_WIFI_PASSWORD);
-
-    if (serial_.open(param_serial_port_.c_str(), 115200, 0, 8, 1, 'N',
-                     serialDataProc, this) != true)
-    {
-        ROS_ERROR("serial error\n");
-        exit(-1);
-    }
-
-    ack();
 
     asr_pub_ = nh_.advertise<std_msgs::String>("/rosecho/asr", 1000);
     answer_pub_ = nh_.advertise<std_msgs::String>("/rosecho/answer", 1000);
-    status_pub_ = nh_.advertise<std_msgs::String>("/rosecho/status", 1000);
     wakeup_pos_pub_ = nh_.advertise<std_msgs::Int16>("/rosecho/wakeup_pos", 1000);
-    tts_sub_ = nh_.subscribe("/rosecho/tts", 1000, &Rosecho::ttsCallback, this);
-    cfg_sub_ = nh_.subscribe("/rosecho/cfg", 1000, &Rosecho::cfgCallback, this);
+
+    ros::ServiceServer wifiCfgService = nh_.advertiseService<rosecho::WifiCfg::Request, rosecho::WifiCfg::Response>("/rosecho/wifi_cfg", boost::bind(&Rosecho::wifiCfg, this, _1, _2));
+    ros::ServiceServer enableService = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("/rosecho/enable", boost::bind(&Rosecho::enable, this, _1, _2));
+    ros::ServiceServer disableService = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("/rosecho/disable", boost::bind(&Rosecho::disable, this, _1, _2));
+    ros::ServiceServer sleepService = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("/rosecho/sleep", boost::bind(&Rosecho::sleep, this, _1, _2));
+    ros::ServiceServer wakeupService = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("/rosecho/wakeup", boost::bind(&Rosecho::wakeup, this, _1, _2));
+#ifdef BACKEND_AIUI
+    backend_ = new Aiui(param_serial_port);
+#else
+#error "No backend device defined"
+#endif
+
+    backend_->asrCallbackRegister(boost::bind(&Rosecho::asrCallback, this, _1));
+    backend_->answerCallbackRegister(boost::bind(&Rosecho::answerCallback, this, _1));
+    backend_->wakeCallbackRegister(boost::bind(&Rosecho::wakeCallback, this, _1));
+    backend_->wifiConnectCallbackRegister(boost::bind(&Rosecho::wifiConnectCallback, this, _1));
+    backend_->wifiDisconnectCallbackRegister(boost::bind(&Rosecho::wifiDisconnectCallback, this));
+
+    rosecho_tts_ = new Rosecho_tts(nh_, "rosecho_tts", backend_);
 }
 
-void Rosecho::wifiCfg(const char *ssid, const char *password, uint8_t mode)
+bool Rosecho::wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response &res)
 {
-    vector<uint8_t> buf;
-
-    uint16_t len = strlen(ssid) + strlen(password) + 4;
-
-    uint8_t checksum = 0;
-
-    int i;
-
-    id_++;
-
-    buf.push_back(0xA5);
-    buf.push_back(0xA5);
-    buf.push_back(0x01);
-
-    buf.push_back(0x02);
-
-    buf.push_back(len & 0xFF);
-    buf.push_back((len >> 8) & 0xFF);
-
-    buf.push_back(id_ & 0xFF);
-    buf.push_back((id_ >> 8) & 0xFF);
-
-    buf.push_back(0x00);
-    buf.push_back(mode);
-    buf.push_back(strlen(ssid));
-    buf.push_back(strlen(password));
-
-    for (i = 0; i < strlen(ssid); i++)
+    int count = 20;
+    isWifiConnected_ = false;
+    backend_->wifiCfg(req.ssid.c_str(), req.password.c_str(), WPA);
+    do
     {
-        buf.push_back(ssid[i]);
-    }
-
-    for (i = 0; i < strlen(password); i++)
+        ros::Duration(0.5).sleep();
+        backend_->wifiStatusCheck();
+    } while (!isWifiConnected_ && count--);
+    res.connected = isWifiConnected_;
+    if (res.connected)
     {
-        buf.push_back(password[i]);
-    }
-
-    for (i = 0; i < buf.size(); i++)
-    {
-        checksum += buf[i];
-    }
-    checksum = (~checksum) + 1;
-
-    buf.push_back(checksum);
-
-    serial_.send(&buf[0], buf.size());
-    buf.clear();
-}
-
-void Rosecho::checkWifiStatus(void)
-{
-    cJSON *root, *content;
-    uint16_t len;
-    vector<uint8_t> buf;
-    char *out;
-
-    uint8_t checksum = 0;
-
-    int i;
-
-    id_++;
-
-    buf.push_back(0xA5);
-    buf.push_back(0x01);
-
-    buf.push_back(0x05);
-
-    root = cJSON_CreateObject();
-
-    cJSON_AddItemToObject(root, "type", cJSON_CreateString("status"));
-    cJSON_AddItemToObject(root, "content", content = cJSON_CreateObject());
-
-    cJSON_AddItemToObject(content, "query", cJSON_CreateString("wifi"));
-
-    out = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    len = strlen(out);
-
-    buf.push_back(len & 0xFF);
-    buf.push_back((len >> 8) & 0xFF);
-
-    buf.push_back(id_ & 0xFF);
-    buf.push_back((id_ >> 8) & 0xFF);
-
-    for (i = 0; i < len; i++)
-    {
-        buf.push_back(out[i]);
-    }
-
-    free(out);
-
-    for (i = 0; i < buf.size(); i++)
-    {
-        checksum += buf[i];
-    }
-    checksum = (~checksum) + 1;
-
-    buf.push_back(checksum);
-
-    serial_.send(&buf[0], buf.size());
-    buf.clear();
-}
-
-// emot is not used by iflytek now
-void Rosecho::tts(uint8_t flag, const char *str, const char *emot)
-{
-    cJSON *root, *content, *parameters;
-    uint16_t len;
-    vector<uint8_t> buf;
-    char *out;
-
-    uint8_t checksum = 0;
-
-    int i;
-
-    id_++;
-
-    buf.push_back(0xA5);
-    buf.push_back(0x01);
-
-    buf.push_back(0x05);
-
-    root = cJSON_CreateObject();
-
-    cJSON_AddItemToObject(root, "type", cJSON_CreateString("tts"));
-    cJSON_AddItemToObject(root, "content", content = cJSON_CreateObject());
-
-    if (flag)
-    {
-        cJSON_AddItemToObject(content, "action", cJSON_CreateString("start"));
-        cJSON_AddItemToObject(content, "text", cJSON_CreateString(str));
-        // cJSON_AddItemToObject(content, "parameters", parameters =
-        // cJSON_CreateObject());
-        // cJSON_AddItemToObject(parameters,"emot",cJSON_CreateString(emot));
+        res.ssid = ssid_;
     }
     else
     {
-        cJSON_AddItemToObject(content, "action", cJSON_CreateString("stop"));
+        res.ssid = "";
     }
 
-    out = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    len = strlen(out);
-
-    buf.push_back(len & 0xFF);
-    buf.push_back((len >> 8) & 0xFF);
-
-    buf.push_back(id_ & 0xFF);
-    buf.push_back((id_ >> 8) & 0xFF);
-
-    for (i = 0; i < len; i++)
-    {
-        buf.push_back(out[i]);
-    }
-
-    free(out);
-
-    for (i = 0; i < buf.size(); i++)
-    {
-        checksum += buf[i];
-    }
-    checksum = (~checksum) + 1;
-
-    buf.push_back(checksum);
-
-    serial_.send(&buf[0], buf.size());
-    buf.clear();
+    return true;
 }
 
-void Rosecho::cfg(const char *config)
+bool Rosecho::enable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
 {
-    cJSON *root, *content;
-    uint16_t len;
-    vector<uint8_t> buf;
-    char *out;
-
-    uint8_t checksum = 0;
-
-    int i;
-
-    if (strcmp("wifi", config) == 0)
-    {
-        wifiCfg(param_ssid_.c_str(), param_password_.c_str(), WPA);
-        return;
-    }
-    else if (strcmp("wifi_status", config) == 0)
-    {
-        checkWifiStatus();
-        return;
-    }
-
-    id_++;
-
-    buf.push_back(0xA5);
-    buf.push_back(0x01);
-
-    buf.push_back(0x05);
-
-    root = cJSON_CreateObject();
-
-    cJSON_AddItemToObject(root, "type", cJSON_CreateString("aiui_msg"));
-    cJSON_AddItemToObject(root, "content", content = cJSON_CreateObject());
-
-    if (strcmp("enable", config) == 0)
-    {
-        cJSON_AddItemToObject(content, "msg_type", cJSON_CreateNumber(5));
-    }
-    else if (strcmp("disable", config) == 0)
-    {
-        cJSON_AddItemToObject(content, "msg_type", cJSON_CreateNumber(6));
-    }
-    else if (strcmp("wakeup", config) == 0)
-    {
-        cJSON_AddItemToObject(content, "msg_type", cJSON_CreateNumber(7));
-    }
-    else if (strcmp("sleep", config) == 0)
-    {
-        cJSON_AddItemToObject(content, "msg_type", cJSON_CreateNumber(8));
-    }
-    else if (strcmp("state", config) == 0)
-    {
-        cJSON_AddItemToObject(content, "msg_type", cJSON_CreateNumber(1));
-    }
-    cJSON_AddItemToObject(content, "arg1", cJSON_CreateNumber(0));
-    cJSON_AddItemToObject(content, "arg2", cJSON_CreateNumber(0));
-    cJSON_AddItemToObject(content, "params", cJSON_CreateString(""));
-
-    out = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    len = strlen(out);
-
-    buf.push_back(len & 0xFF);
-    buf.push_back((len >> 8) & 0xFF);
-
-    buf.push_back(id_ & 0xFF);
-    buf.push_back((id_ >> 8) & 0xFF);
-
-    for (i = 0; i < len; i++)
-    {
-        buf.push_back(out[i]);
-    }
-
-    free(out);
-
-    for (i = 0; i < buf.size(); i++)
-    {
-        checksum += buf[i];
-    }
-    checksum = (~checksum) + 1;
-
-    buf.push_back(checksum);
-
-    serial_.send(&buf[0], buf.size());
-    buf.clear();
+    backend_->enable();
 }
 
-void Rosecho::ack(void)
+bool Rosecho::disable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
 {
-    int i;
-    uint8_t checksum = 0;
-    vector<uint8_t> buf;
-    buf.push_back(0xA5);
-    buf.push_back(0x01);
-    buf.push_back(0xff); // 0xff confirm msg type
-    buf.push_back(0x04);
-    buf.push_back(0x00);
-    buf.push_back(id_ & 0xff); // Msg ID should be the same as recv msg
-    buf.push_back((id_ >> 8) & 0xFF);
-    buf.push_back(0xA5);
-    buf.push_back(0x00);
-    buf.push_back(0x00);
-    buf.push_back(0x00);
-
-    //checksum
-    for (i = 0; i < buf.size(); i++)
-    {
-        checksum += buf[i];
-    }
-    checksum = ~checksum + 1;
-    buf.push_back(checksum);
-
-    serial_.send(&buf[0], buf.size());
-    buf.clear();
+    backend_->disable();
 }
 
-void Rosecho::rosechoDataProc(unsigned char *buf, int len)
+bool Rosecho::wakeup(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
 {
-    int i;
-    if (buf[2] == 0xff)
-    {
-        //Do nothing
-        return;
-    }
-
-    unsigned char unzip_buf[100 * 1024];
-    int unzip_len = sizeof(unzip_buf);
-
-    id_ = buf[5] + buf[6] * 256;
-    ack();
-
-    if (buf[2] != 0x04)
-    {
-        return;
-    }
-
-    if (gzdecompress(buf + 7, buf[3] + buf[4] * 256, unzip_buf,
-                     (ulong *)&unzip_len) != 0)
-    {
-        ROS_ERROR("gzip error\n");
-        return;
-    }
-    unzip_buf[unzip_len] = '\0';
-    cJSON *json, *p;
-    char key_asr[4][10] = {"content", "result", "intent", "text"};
-    char key_answer[5][10] = {"content", "result", "intent", "answer", "text"};
-    json = cJSON_Parse((const char *)unzip_buf);
-    if (!json)
-    {
-        // printf("Error before: [%s]\n",cJSON_GetErrorPtr());
-        ROS_ERROR("Error before: [%s]\n", cJSON_GetErrorPtr());
-    }
-    else
-    {
-        int i;
-        p = json;
-        for (i = 0; i < 4; i++)
-        {
-            p = cJSON_GetObjectItem(p, key_asr[i]);
-            if (!p)
-            {
-                break;
-            }
-        }
-        if (i == 4)
-        {
-            char *out = cJSON_Print(p);
-            std_msgs::String asr_msg;
-            asr_msg.data = out;
-            ROS_DEBUG("%s\n", asr_msg.data.c_str());
-            asr_pub_.publish(asr_msg);
-            free(out);
-        }
-
-        p = json;
-        for (i = 0; i < 5; i++)
-        {
-            p = cJSON_GetObjectItem(p, key_answer[i]);
-            if (!p)
-            {
-                break;
-            }
-        }
-        if (i == 5)
-        {
-            char *out = cJSON_Print(p);
-            std_msgs::String answer_msg;
-            answer_msg.data = out;
-            ROS_DEBUG("%s\n", answer_msg.data.c_str());
-            answer_pub_.publish(answer_msg);
-            free(out);
-        }
-        p = cJSON_GetObjectItem(json, "type");
-        if (p)
-        {
-            if (strcmp(p->valuestring, "tts_event") == 0)
-            {
-                p = cJSON_GetObjectItem(json, "content");
-                if (p)
-                {
-                    p = cJSON_GetObjectItem(p, "eventType");
-                    if (p)
-                    {
-                        if (p->valueint == 0)
-                        {
-                            std_msgs::String status_msg;
-                            status_msg.data = "tts:start";
-                            status_pub_.publish(status_msg);
-                        }
-                        else
-                        {
-                            std_msgs::String status_msg;
-                            status_msg.data = "tts:end";
-                            status_pub_.publish(status_msg);
-                        }
-                    }
-                }
-            }
-            else if (strcmp(p->valuestring, "aiui_event") == 0)
-            {
-                p = cJSON_GetObjectItem(json, "content");
-                if (p)
-                {
-                    cJSON *q;
-                    q = cJSON_GetObjectItem(p, "eventType");
-                    if (q)
-                    {
-                        if (q->valueint == 5) // sleep event
-                        {
-                            std_msgs::String status_msg;
-                            status_msg.data = "state:sleep";
-                            status_pub_.publish(status_msg);
-                        }
-                        else if (q->valueint == 4) // wakeup event
-                        {
-                            q = cJSON_GetObjectItem(p, "info");
-                            if (q)
-                            {
-                                q = cJSON_GetObjectItem(q, "angle");
-                                if (q)
-                                {
-                                    std_msgs::Int16 wakeup_pos_msg;
-                                    wakeup_pos_msg.data = 360 - q->valueint;
-                                    wakeup_pos_pub_.publish(wakeup_pos_msg);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else if (strcmp(p->valuestring, "wifi_status") == 0)
-            {
-                p = cJSON_GetObjectItem(json, "content");
-                if (p)
-                {
-                    cJSON *q;
-                    q = cJSON_GetObjectItem(p, "connected");
-                    if (q)
-                    {
-                        if (q->type == cJSON_False)
-                        {
-                            std_msgs::String status_msg;
-                            status_msg.data = "wifi:false";
-                            status_pub_.publish(status_msg);
-                        }
-                        else if (q->type == cJSON_True)
-                        {
-                            std_msgs::String status_msg;
-                            status_msg.data = "wifi:true";
-                            q = cJSON_GetObjectItem(p, "ssid");
-                            if (q)
-                            {
-                                status_msg.data += q->valuestring;
-                            }
-                            status_pub_.publish(status_msg);
-                        }
-                    }
-                }
-            }
-        }
-
-        cJSON_Delete(json);
-    }
+    backend_->wakeup();
 }
 
-void Rosecho::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
+bool Rosecho::sleep(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
 {
-    Rosecho *pThis = (Rosecho *)param;
-    static uint8_t state = 0;
-    uint8_t *p = data;
-    static vector<uint8_t> recv_msg;
-    static uint32_t len;
-    uint32_t j;
+    backend_->sleep();
+}
 
-    while (data_len != 0)
-    {
-        switch (state)
-        {
-        case 0:
-            if (*p == SYNC_HEAD)
-            {
-                recv_msg.clear();
-                recv_msg.push_back(SYNC_HEAD);
-                state = 1;
-            }
-            p++;
-            data_len--;
-            break;
+void Rosecho::asrCallback(string str)
+{
+    std_msgs::String asr_msg;
+    asr_msg.data = str;
+    asr_pub_.publish(asr_msg);
+}
 
-        case 1:
-            if (*p == SYNC_HEAD_SECOND)
-            {
-                recv_msg.push_back(SYNC_HEAD_SECOND);
-                p++;
-                data_len--;
-                state = 2;
-            }
-            else
-            {
-                state = 0;
-            }
-            break;
+void Rosecho::answerCallback(string str)
+{
+    std_msgs::String answer_msg;
+    answer_msg.data = str;
+    answer_pub_.publish(answer_msg);
+}
 
-        case 2:
-            recv_msg.push_back(*p);
-            p++;
-            data_len--;
-            state = 3;
-            break;
+void Rosecho::wakeCallback(int angle)
+{
+    std_msgs::Int16 wakeup_pos_msg;
+    wakeup_pos_msg.data = angle;
+    wakeup_pos_pub_.publish(wakeup_pos_msg);
+}
 
-        case 3: // len
-            recv_msg.push_back(*p);
-            len = *p;
-            p++;
-            data_len--;
-            state = 4;
-            break;
+void Rosecho::wifiConnectCallback(string str)
+{
+    ssid_ = str;
+    ROS_INFO("SSID [%s] connect", ssid_.c_str());
+    isWifiConnected_ = true;
+}
 
-        case 4: // len
-            recv_msg.push_back(*p);
-            len += (*p) * 256;
-            if (len > 1024 * 10)
-            {
-                state = 0;
-                break;
-            }
-            p++;
-            data_len--;
-            state = 5;
-            break;
-
-        case 5: // id
-            recv_msg.push_back(*p);
-            p++;
-            data_len--;
-            state = 6;
-            break;
-
-        case 6: // id
-            recv_msg.push_back(*p);
-            p++;
-            data_len--;
-            state = 7;
-            break;
-
-        case 7: //
-            if (len--)
-            {
-                recv_msg.push_back(*p);
-                p++;
-                data_len--;
-            }
-            else
-            {
-                int i;
-                uint8_t crc = 0;
-                recv_msg.push_back(*p);
-                p++;
-                data_len--;
-                state = 0;
-                for (i = 0; i < recv_msg.size() - 1; i++)
-                {
-                    crc += recv_msg[i];
-                }
-                crc = (~crc) + 1;
-                if (crc == recv_msg[recv_msg.size() - 1])
-                {
-                    pThis->rosechoDataProc(&recv_msg[0], recv_msg.size()); // process recv msg
-                }
-                else
-                {
-                    ROS_ERROR("crc error");
-                }
-            }
-            break;
-
-        default:
-            state = 0;
-            break;
-        }
-    }
+void Rosecho::wifiDisconnectCallback(void)
+{
+    ROS_INFO("Wifi disconnect");
+    isWifiConnected_ = false;
 }
