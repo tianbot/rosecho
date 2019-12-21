@@ -120,7 +120,7 @@ bool Rosecho::wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response
     res.connected = isWifiConnected_;
     if (res.connected)
     {
-        res.ssid = ssid_;
+        res.ssid = ssid_.substr(1, ssid_.length()-2);//replace head and tail "
     }
     else
     {
