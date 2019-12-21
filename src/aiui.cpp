@@ -631,6 +631,7 @@ void Aiui::aiuiDataProc(unsigned char *buf, int len)
                         }
                         else if (q->type == cJSON_True)
                         {
+                            q = cJSON_GetObjectItem(p, "ssid");
                             if (q)
                             {
                                 if (wifiConnectCB_ != NULL)

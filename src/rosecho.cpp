@@ -75,23 +75,23 @@ void Rosecho_tts::preemptCB()
     as_.setPreempted();
 }
 
-Rosecho::Rosecho(void)
+Rosecho::Rosecho(ros::NodeHandle *nh):nh_(*nh)
 {
     std::string param_serial_port;
-    nh_ = ros::NodeHandle("rosecho");
+    //nh_ = ros::NodeHandle("rosecho");
 
     nh_.param<std::string>("serial_port", param_serial_port,
                            DEFAULT_SERIAL_DEVICE);
 
-    asr_pub_ = nh_.advertise<std_msgs::String>("/rosecho/asr", 1000);
-    answer_pub_ = nh_.advertise<std_msgs::String>("/rosecho/answer", 1000);
-    wakeup_pos_pub_ = nh_.advertise<std_msgs::Int16>("/rosecho/wakeup_pos", 1000);
+    asr_pub_ = nh_.advertise<std_msgs::String>("asr", 1000);
+    answer_pub_ = nh_.advertise<std_msgs::String>("answer", 1000);
+    wakeup_pos_pub_ = nh_.advertise<std_msgs::Int16>("wakeup_pos", 1000);
 
-    ros::ServiceServer wifiCfgService = nh_.advertiseService<rosecho::WifiCfg::Request, rosecho::WifiCfg::Response>("/rosecho/wifi_cfg", boost::bind(&Rosecho::wifiCfg, this, _1, _2));
-    ros::ServiceServer enableService = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("/rosecho/enable", boost::bind(&Rosecho::enable, this, _1, _2));
-    ros::ServiceServer disableService = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("/rosecho/disable", boost::bind(&Rosecho::disable, this, _1, _2));
-    ros::ServiceServer sleepService = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("/rosecho/sleep", boost::bind(&Rosecho::sleep, this, _1, _2));
-    ros::ServiceServer wakeupService = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("/rosecho/wakeup", boost::bind(&Rosecho::wakeup, this, _1, _2));
+    wifiCfgService_ = nh_.advertiseService<rosecho::WifiCfg::Request, rosecho::WifiCfg::Response>("wifi_cfg", boost::bind(&Rosecho::wifiCfg, this, _1, _2));
+    enableService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("enable", boost::bind(&Rosecho::enable, this, _1, _2));
+    disableService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("disable", boost::bind(&Rosecho::disable, this, _1, _2));
+    sleepService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("sleep", boost::bind(&Rosecho::sleep, this, _1, _2));
+    wakeupService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("wakeup", boost::bind(&Rosecho::wakeup, this, _1, _2));
 #ifdef BACKEND_AIUI
     backend_ = new Aiui(param_serial_port);
 #else
@@ -104,7 +104,7 @@ Rosecho::Rosecho(void)
     backend_->wifiConnectCallbackRegister(boost::bind(&Rosecho::wifiConnectCallback, this, _1));
     backend_->wifiDisconnectCallbackRegister(boost::bind(&Rosecho::wifiDisconnectCallback, this));
 
-    rosecho_tts_ = new Rosecho_tts(nh_, "rosecho_tts", backend_);
+    rosecho_tts_ = new Rosecho_tts(nh_, "tts", backend_);
 }
 
 bool Rosecho::wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response &res)
@@ -124,7 +124,7 @@ bool Rosecho::wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response
     }
     else
     {
-        res.ssid = "";
+        res.ssid = req.ssid;
     }
 
     return true;
@@ -133,21 +133,26 @@ bool Rosecho::wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response
 bool Rosecho::enable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
 {
     backend_->enable();
+    ros::Duration(1).sleep();//wait backend ready
+    return true;
 }
 
 bool Rosecho::disable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
 {
     backend_->disable();
+    return true;
 }
 
 bool Rosecho::wakeup(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
 {
     backend_->wakeup();
+    return true;
 }
 
 bool Rosecho::sleep(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
 {
     backend_->sleep();
+    return true;
 }
 
 void Rosecho::asrCallback(string str)
@@ -174,12 +179,12 @@ void Rosecho::wakeCallback(int angle)
 void Rosecho::wifiConnectCallback(string str)
 {
     ssid_ = str;
-    ROS_INFO("SSID [%s] connect", ssid_.c_str());
+    //ROS_INFO("SSID [%s] connect", ssid_.c_str());
     isWifiConnected_ = true;
 }
 
 void Rosecho::wifiDisconnectCallback(void)
 {
-    ROS_INFO("Wifi disconnect");
+    //ROS_INFO("Wifi disconnect");
     isWifiConnected_ = false;
 }

@@ -90,7 +90,7 @@ protected:
 class Rosecho
 {
 public:
-    Rosecho(void);
+    Rosecho(ros::NodeHandle *nh);
 
 private:
     ros::Publisher asr_pub_;
@@ -104,6 +104,11 @@ private:
 #error "No backend device defined"
 #endif
     Rosecho_tts *rosecho_tts_;
+    ros::ServiceServer wifiCfgService_;
+    ros::ServiceServer enableService_;
+    ros::ServiceServer disableService_;
+    ros::ServiceServer sleepService_;
+    ros::ServiceServer wakeupService_;
     void answerCallback(string str);
     void asrCallback(string str);
     void wakeCallback(int angle);
