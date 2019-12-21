@@ -56,23 +56,24 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
+add_service_files(
+  FILES
+  WifiCfg.srv
 #   Service2.srv
-# )
+ )
 
 ## Generate actions in the 'action' folder
-#add_action_files(
-#  DIRECTORY action
-#  FILES processing_tts.action
-#)
+add_action_files(
+  DIRECTORY action
+  FILES tts.action
+)
 
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
   std_msgs
+  actionlib_msgs
 )
 
 ################################################
@@ -135,7 +136,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/rosecho.cpp src/serial.cpp src/main.cpp src/cJSON.c src/gzip.c)
+add_executable(${PROJECT_NAME}_node src/rosecho.cpp src/serial.cpp src/main.cpp src/cJSON.c src/gzip.c src/aiui.cpp)
 #add_executable(test_server src/test_server.cpp)
 #add_executable(test_client src/test_action.cpp)
 

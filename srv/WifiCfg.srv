@@ -1,0 +1,5 @@
+string ssid
+string password
+---
+bool connected
+string ssid

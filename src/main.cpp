@@ -34,8 +34,8 @@
 int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "rosecho_node");
-
-    Rosecho rosecho;
+    ros::NodeHandle nh("rosecho");
+    Rosecho rosecho(&nh);
 
     ros::Rate loop_rate(10);
 

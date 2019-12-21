@@ -1,0 +1,8 @@
+#goal
+string text
+---
+#result
+bool is_finished
+---
+#feedback
+bool is_finished
