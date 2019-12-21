@@ -14,6 +14,7 @@ Aiui::Aiui(string serial_port)
     wakeCB_ = NULL;
     wifiConnectCB_ = NULL;
     wifiDisconnectCB_ = NULL;
+    isAnswerFlag_ = false;
     if (serial_.open(serial_port.c_str(), 115200, 0, 8, 1, 'N',
                      boost::bind(&Aiui::serialDataProc, this, _1, _2)) != true)
     {
@@ -126,6 +127,8 @@ void Aiui::tts(uint8_t flag, const char *str, const char *emot)
 
     serial_.send(&buf[0], buf.size());
     buf.clear();
+
+    isAnswerFlag_ = false;
 }
 
 void Aiui::wifiCfg(const char *ssid, const char *password, uint8_t mode)
@@ -544,6 +547,7 @@ void Aiui::aiuiDataProc(unsigned char *buf, int len)
         if (i == 5)
         {
             char *out = cJSON_Print(p);
+            isAnswerFlag_ = true;
             if (answerCB_ != NULL)
             {
                 string answerStr(out);
@@ -556,24 +560,27 @@ void Aiui::aiuiDataProc(unsigned char *buf, int len)
         {
             if (strcmp(p->valuestring, "tts_event") == 0)
             {
-                p = cJSON_GetObjectItem(json, "content");
-                if (p)
+                if (!isAnswerFlag_)
                 {
-                    p = cJSON_GetObjectItem(p, "eventType");
+                    p = cJSON_GetObjectItem(json, "content");
                     if (p)
                     {
-                        if (p->valueint == 0)
+                        p = cJSON_GetObjectItem(p, "eventType");
+                        if (p)
                         {
-                            if (ttsStartCB_ != NULL)
+                            if (p->valueint == 0)
                             {
-                                ttsStartCB_();
+                                if (ttsStartCB_ != NULL)
+                                {
+                                    ttsStartCB_();
+                                }
                             }
-                        }
-                        else
-                        {
-                            if (ttsFinishCB_ != NULL)
+                            else
                             {
-                                ttsFinishCB_();
+                                if (ttsFinishCB_ != NULL)
+                                {
+                                    ttsFinishCB_();
+                                }
                             }
                         }
                     }

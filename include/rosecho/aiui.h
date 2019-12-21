@@ -53,6 +53,7 @@ private:
     void cfg(const char *config);
     uint16_t id_;
     Serial serial_;
+    bool isAnswerFlag_;
     aiui_cb_str asrCB_;
     aiui_cb_str answerCB_;
     aiui_cb_noparam ttsStartCB_;
