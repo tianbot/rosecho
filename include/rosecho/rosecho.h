@@ -110,10 +110,10 @@ private:
     void wifiConnectCallback(string str);
     void wifiDisconnectCallback(void);
     bool wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response &res);
-    bool enable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res);
-    bool disable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res);
-    bool wakeup(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res);
-    bool sleep(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res);
+    bool enable(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+    bool disable(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+    bool wakeup(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+    bool sleep(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 
     bool isWifiConnected_;
     std::string ssid_;

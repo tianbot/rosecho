@@ -29,7 +29,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "serial.h"
-#include <boost/bind.hpp>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -53,22 +52,21 @@
     printf(format, ##__VA_ARGS__);   \
     printf("\n")
 
-static void *serial_recv(void *param)
+void *Serial::serial_recv(void *p)
 {
-    struct thread_param *p = (struct thread_param *)param;
     uint8_t recvbuff[1024];
     int recvlen = 0;
-    Serial *pThis = (Serial *)p->param1;
-    while (pThis->running)
+    Serial *pThis = (Serial *)p;
+    while (pThis->running_)
     {
         memset(recvbuff, 0, sizeof(recvbuff));
 
-        if ((recvlen = read(pThis->fd, recvbuff, sizeof(recvbuff))) == -1)
+        if ((recvlen = read(pThis->fd_, recvbuff, sizeof(recvbuff))) == -1)
         {
             DBG_LOG_ERROR("uart_recv error:%d", errno);
             continue;
         }
-        pThis->recv_cb(recvbuff, recvlen, p->param2);
+        pThis->recv_cb_(recvbuff, recvlen);
     }
     return NULL;
 }
@@ -84,7 +82,7 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
     struct termios options;
 
     //获取设备属性信息
-    if (tcgetattr(fd, &options) != 0)
+    if (tcgetattr(fd_, &options) != 0)
     {
         perror("SetupSerial");
         return false;
@@ -194,10 +192,10 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
     options.c_cc[VMIN] = 1;  /* 读取字符的最少个数为1 */
 
     //如果发生数据溢出，接收数据，但是不再读取
-    tcflush(fd, TCIFLUSH);
+    tcflush(fd_, TCIFLUSH);
 
     //激活配置 (将修改后的termios数据设置到串口中）
-    if (tcsetattr(fd, TCSANOW, &options) != 0)
+    if (tcsetattr(fd_, TCSANOW, &options) != 0)
     {
         perror("com set error!/n");
         return false;
@@ -206,12 +204,11 @@ bool Serial::config(int speed, int flow_ctrl, int databits, int stopbits,
 }
 
 bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
-                  int stopbits, int parity, serial_recv_cb cb, void *param)
+                  int stopbits, int parity, serial_recv_cb cb)
 {
     int ret;
     pthread_attr_t attr;
-    static struct thread_param tparam = {this, param};
-    recv_thread = 0;
+    recv_thread_ = 0;
     DBG_LOG_TRACE("open serial %s start\n", device);
     //句柄检查
     if (NULL == device || NULL == cb)
@@ -220,11 +217,11 @@ bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
         return false;
     }
 
-    recv_cb = cb;
+    recv_cb_ = cb;
 
     //打开设备
-    fd = ::open(device, O_RDWR);
-    if (fd < 0)
+    fd_ = ::open(device, O_RDWR);
+    if (fd_ < 0)
     {
         DBG_LOG_ERROR("open failed: %s\n", device);
         return false;
@@ -234,12 +231,12 @@ bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
     {
         goto error;
     }
-    running = 1;
+    running_ = 1;
 
     //创建线程，接收数据
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //分离属性
-    ret = pthread_create(&recv_thread, &attr, serial_recv, &tparam);
+    ret = pthread_create(&recv_thread_, &attr, serial_recv, this);
     if (0 != ret)
     {
         DBG_LOG_ERROR("uart recv thread create failed!\n");
@@ -250,14 +247,14 @@ bool Serial::open(const char *device, int rate, int flow_ctrl, int databits,
     return true;
 
 error:
-    running = 0;
-    if (fd > 0)
+    running_ = 0;
+    if (fd_ > 0)
     {
-        ::close(fd);
+        ::close(fd_);
     }
-    if (0 != recv_thread)
+    if (0 != recv_thread_)
     {
-        pthread_join(recv_thread, NULL);
+        pthread_join(recv_thread_, NULL);
     }
     return false;
 }
@@ -267,7 +264,7 @@ int Serial::send(uint8_t *data, int len)
     int ret = 0;
     int sended_len = 0;
 
-    if (fd <= 0)
+    if (fd_ <= 0)
     {
         return -1;
     }
@@ -276,7 +273,7 @@ int Serial::send(uint8_t *data, int len)
     while (sended_len != len)
     {
         int retlen = 0;
-        retlen = write(fd, data + sended_len, len - sended_len);
+        retlen = write(fd_, data + sended_len, len - sended_len);
         if (retlen < 0)
         {
             DBG_LOG_ERROR("serial send failed! ret=%d\n", ret);
@@ -290,13 +287,13 @@ int Serial::send(uint8_t *data, int len)
 
 void Serial::close(void)
 {
-    running = 0;
-    if (fd > 0)
+    running_ = 0;
+    if (fd_ > 0)
     {
-        ::close(fd);
+        ::close(fd_);
     }
-    if (0 != recv_thread)
+    if (0 != recv_thread_)
     {
-        pthread_join(recv_thread, NULL);
+        pthread_join(recv_thread_, NULL);
     }
 }

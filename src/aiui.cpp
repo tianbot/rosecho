@@ -15,7 +15,7 @@ Aiui::Aiui(string serial_port)
     wifiConnectCB_ = NULL;
     wifiDisconnectCB_ = NULL;
     if (serial_.open(serial_port.c_str(), 115200, 0, 8, 1, 'N',
-                     serialDataProc, this) != true)
+                     boost::bind(&Aiui::serialDataProc, this, _1, _2)) != true)
     {
         exit(-1);
     }
@@ -357,9 +357,8 @@ void Aiui::ack(void)
     buf.clear();
 }
 
-void Aiui::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
+void Aiui::serialDataProc(uint8_t *data, unsigned int data_len)
 {
-    Aiui *pThis = (Aiui *)param;
     static uint8_t state = 0;
     uint8_t *p = data;
     static vector<uint8_t> recv_msg;
@@ -459,7 +458,7 @@ void Aiui::serialDataProc(uint8_t *data, unsigned int data_len, void *param)
                 crc = (~crc) + 1;
                 if (crc == recv_msg[recv_msg.size() - 1])
                 {
-                    pThis->aiuiDataProc(&recv_msg[0], recv_msg.size()); // process recv msg
+                    aiuiDataProc(&recv_msg[0], recv_msg.size()); // process recv msg
                 }
                 else
                 {
