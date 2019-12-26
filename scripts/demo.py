@@ -2,10 +2,11 @@
 #coding=utf8
 import roslib
 import rospy  
-import actionlib  
+import actionlib
 from actionlib_msgs.msg import *  
 from geometry_msgs.msg import Pose, Point, Quaternion, Twist, PoseWithCovarianceStamped  
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal  
+from rosecho.msg import ttsAction, ttsGoal
 from std_msgs.msg import Int16, String
 from nav_msgs.msg import Odometry
 from tf.transformations import quaternion_from_euler, euler_from_quaternion, quaternion_multiply
@@ -27,6 +28,13 @@ class RosEchoNav():
             ros_msg = unicode(ros_msg, "utf8")
 
         if cmd == ros_msg:
+            self.rosecho_tts.cancel_goal()
+
+            text = ttsGoal()
+            text.text = "我去端茶啦！"
+            self.speak(text)
+
+
             self.move_base.cancel_goal()
     
             goal = MoveBaseGoal()
@@ -44,6 +52,12 @@ class RosEchoNav():
             self.move(goal)
 
         if ros_msg == u"回家":
+            self.rosecho_tts.cancel_goal()
+
+            text = ttsGoal()
+            text.text = "收到！回家喽！"
+            self.speak(text)
+
             self.move_base.cancel_goal()
  
             goal = MoveBaseGoal()
@@ -89,15 +103,19 @@ class RosEchoNav():
         rospy.on_shutdown(self.shutdown)  
 
         # Subscribe to the move_base action server  
-        self.move_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)  
+        self.move_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
 
-        rospy.loginfo("Waiting for move_base action server...")  
+        self.rosecho_tts = actionlib.SimpleActionClient("rosecho/tts",ttsAction)
+
+        rospy.loginfo("Waiting for move_base and rosecho tts action server...")  
 
         # Wait 60 seconds for the action server to become available  
 
-        self.move_base.wait_for_server(rospy.Duration(60))  
-
+        self.move_base.wait_for_server(rospy.Duration(6))  
         rospy.loginfo("Connected to move base server")  
+
+        self.rosecho_tts.wait_for_server(rospy.Duration(6))
+        rospy.loginfo("Connected to rosecho tts server")     
 
         rospy.loginfo("Starting navigation test")  
 
@@ -119,10 +137,27 @@ class RosEchoNav():
             self.move_base.cancel_goal()  
             rospy.loginfo("Timed out achieving goal")  
         else:  
-            # We made it!  
+            # We made it!
             state = self.move_base.get_state()  
             if state == GoalStatus.SUCCEEDED:  
                 rospy.loginfo("Goal succeeded!")  
+
+    def speak(self, text):  
+
+        # Send the goal pose to the tts server  
+        self.rosecho_tts.send_goal(text)
+        rospy.loginfo(text.text);  
+        # Allow 1 minute to speak  
+        finished_within_time = self.rosecho_tts.wait_for_result(rospy.Duration(5))   
+        # If we don't finish in time, abort the goal  
+        if not finished_within_time:  
+            self.rosecho_tts.cancel_goal()  
+            rospy.loginfo("TTS Time Out!!")  
+        else:  
+            # We made it!  
+            state = self.rosecho_tts.get_state()  
+            if state == GoalStatus.SUCCEEDED:  
+                rospy.loginfo("TTS finished!") 
 
     def shutdown(self):  
 
@@ -131,6 +166,9 @@ class RosEchoNav():
         # Cancel any active goals  
 
         self.move_base.cancel_goal()
+        rospy.sleep(2)
+
+        self.rosecho_tts.cancel_goal()
         rospy.sleep(2)
 
         self.cmd_vel_pub.publish(Twist())  
