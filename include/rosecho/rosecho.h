@@ -91,7 +91,7 @@ class Rosecho
 {
 public:
     Rosecho(ros::NodeHandle *nh);
-
+    ~Rosecho();
 private:
     ros::Publisher asr_pub_;
     ros::Publisher answer_pub_;

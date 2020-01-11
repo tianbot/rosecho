@@ -107,6 +107,12 @@ Rosecho::Rosecho(ros::NodeHandle *nh):nh_(*nh)
     rosecho_tts_ = new Rosecho_tts(nh_, "tts", backend_);
 }
 
+Rosecho::~Rosecho()
+{
+    delete backend_;
+    delete rosecho_tts_;
+}
+
 bool Rosecho::wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response &res)
 {
     int count = 20;
