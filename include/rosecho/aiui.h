@@ -22,9 +22,9 @@ using namespace boost;
 #define SYNC_HEAD 0xa5
 #define SYNC_HEAD_SECOND 0x01
 
-typedef function<void(string str)> aiui_cb_str;
-typedef function<void(int n)> aiui_cb_int;
-typedef function<void(void)> aiui_cb_noparam;
+typedef boost::function<void(string str)> aiui_cb_str;
+typedef boost::function<void(int n)> aiui_cb_int;
+typedef boost::function<void(void)> aiui_cb_noparam;
 
 class Aiui
 {
