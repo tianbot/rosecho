@@ -123,11 +123,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-## Declare a C++ library
-# add_library(
-#  gzip src/gzip.c 
-# )
-
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
@@ -137,9 +132,6 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node src/rosecho.cpp src/serial.cpp src/main.cpp src/cJSON.c src/gzip.c src/aiui.cpp)
-#add_executable(test_server src/test_server.cpp)
-#add_executable(test_client src/test_action.cpp)
-
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -149,35 +141,14 @@ add_executable(${PROJECT_NAME}_node src/rosecho.cpp src/serial.cpp src/main.cpp 
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-#add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-#add_dependencies(test_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-#add_dependencies(test_client ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
+add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-#target_link_libraries(gzip
-#   ${LIBRARIES} 
-#   ${catkin_LIBRARIES}
-#   z
-#)
 target_link_libraries(${PROJECT_NAME}_node
    ${LIBRARIES} 
    ${catkin_LIBRARIES}
    m z pthread
 )
-#target_link_libraries(test_server
-#   ${LIBRARIES} 
-#   ${catkin_LIBRARIES}
-#   m z pthread
-#)
-#
-#target_link_libraries(test_client
-#   ${LIBRARIES} 
-#   ${catkin_LIBRARIES}
-#   m z pthread
-#)
 
 #############
 ## Install ##
