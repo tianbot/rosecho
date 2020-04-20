@@ -2,11 +2,7 @@
 
 <launch>
   <arg name="serial_port" default="/dev/ttyUSB0" />
-  <arg name="ssid" default="tianbot" />
-  <arg name="password" default="www.tianbot.com" />
   <node pkg="rosecho" type="rosecho_node" name="rosecho" output="screen">
     <param name="serial_port" type="string" value="$(arg serial_port)"/>
-    <param name="wifi_ssid" type="string" value="$(arg ssid)"/>
-    <param name="wifi_password" type="string" value="$(arg password)"/>
   </node>
 </launch>
