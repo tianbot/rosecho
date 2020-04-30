@@ -22,9 +22,15 @@ using namespace boost;
 #define SYNC_HEAD 0xa5
 #define SYNC_HEAD_SECOND 0x01
 
+struct intent{
+    string name;
+    string normValue;
+};
+
 typedef boost::function<void(string str)> aiui_cb_str;
 typedef boost::function<void(int n)> aiui_cb_int;
 typedef boost::function<void(void)> aiui_cb_noparam;
+typedef boost::function<void(vector<struct intent>)> aiui_cb_intent;
 
 class Aiui
 {
@@ -44,6 +50,7 @@ public:
     void wakeCallbackRegister(aiui_cb_int cb);
     void wifiDisconnectCallbackRegister(aiui_cb_noparam cb);
     void wifiConnectCallbackRegister(aiui_cb_str cb);
+    void intentCallbackRegister(aiui_cb_intent cb);
     Aiui(string serial_port);
 
 private:
@@ -62,6 +69,7 @@ private:
     aiui_cb_int wakeCB_;
     aiui_cb_noparam wifiDisconnectCB_;
     aiui_cb_str wifiConnectCB_;
+    aiui_cb_intent intentCB_;
 };
 
 #endif

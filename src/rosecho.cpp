@@ -86,7 +86,7 @@ Rosecho::Rosecho(ros::NodeHandle *nh):nh_(*nh)
     asr_pub_ = nh_.advertise<std_msgs::String>("asr", 1000);
     answer_pub_ = nh_.advertise<std_msgs::String>("answer", 1000);
     wakeup_pos_pub_ = nh_.advertise<std_msgs::Int16>("wakeup_pos", 1000);
-
+    intent_pub_ = nh_.advertise<rosecho::intentSlots>("intent", 1000);
     wifiCfgService_ = nh_.advertiseService<rosecho::WifiCfg::Request, rosecho::WifiCfg::Response>("wifi_cfg", boost::bind(&Rosecho::wifiCfg, this, _1, _2));
     enableService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("enable", boost::bind(&Rosecho::enable, this, _1, _2));
     disableService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("disable", boost::bind(&Rosecho::disable, this, _1, _2));
@@ -103,7 +103,7 @@ Rosecho::Rosecho(ros::NodeHandle *nh):nh_(*nh)
     backend_->wakeCallbackRegister(boost::bind(&Rosecho::wakeCallback, this, _1));
     backend_->wifiConnectCallbackRegister(boost::bind(&Rosecho::wifiConnectCallback, this, _1));
     backend_->wifiDisconnectCallbackRegister(boost::bind(&Rosecho::wifiDisconnectCallback, this));
-
+    backend_->intentCallbackRegister(boost::bind(&Rosecho::intentCallback, this, _1));
     rosecho_tts_ = new Rosecho_tts(nh_, "tts", backend_);
 }
 
@@ -173,6 +173,24 @@ void Rosecho::answerCallback(string str)
     std_msgs::String answer_msg;
     answer_msg.data = str;
     answer_pub_.publish(answer_msg);
+}
+
+void Rosecho::intentCallback(vector<struct intent> slots)
+{
+    rosecho::intentSlots intent_msg;
+    rosecho::slot temp_slot;
+    struct intent temp;
+    int count = slots.size();
+    int i;
+    printf("intent");
+    for(i=0; i<count; i++)
+    {
+        temp = slots[i];
+        temp_slot.name = temp.name;
+        temp_slot.normValue = temp.normValue;
+        intent_msg.intentSlots.push_back(temp_slot);
+    }
+    intent_pub_.publish(intent_msg);
 }
 
 void Rosecho::wakeCallback(int angle)

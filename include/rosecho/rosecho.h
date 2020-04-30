@@ -43,6 +43,7 @@
 #include "rosecho/WifiCfg.h"
 #include "std_srvs/Empty.h"
 #include "stdint.h"
+#include "rosecho/intentSlots.h"
 
 using namespace std;
 
@@ -96,6 +97,7 @@ private:
     ros::Publisher asr_pub_;
     ros::Publisher answer_pub_;
     ros::Publisher wakeup_pos_pub_;
+    ros::Publisher intent_pub_;
     ros::NodeHandle nh_;
 
 #ifdef BACKEND_AIUI
@@ -111,6 +113,7 @@ private:
     ros::ServiceServer wakeupService_;
     void answerCallback(string str);
     void asrCallback(string str);
+    void intentCallback(vector<struct intent>);
     void wakeCallback(int angle);
     void wifiConnectCallback(string str);
     void wifiDisconnectCallback(void);

@@ -34,6 +34,11 @@ void Aiui::answerCallbackRegister(aiui_cb_str cb)
     answerCB_ = cb;
 }
 
+void Aiui::intentCallbackRegister(aiui_cb_intent cb)
+{
+    intentCB_ = cb;
+}
+
 void Aiui::ttsStartCallbackRegister(aiui_cb_noparam cb)
 {
     ttsStartCB_ = cb;
@@ -507,6 +512,7 @@ void Aiui::aiuiDataProc(unsigned char *buf, int len)
     cJSON *json, *p;
     char key_asr[4][10] = {"content", "result", "intent", "text"};
     char key_answer[5][10] = {"content", "result", "intent", "answer", "text"};
+    char key_intent[4][10] = {"content", "result", "intent", "semantic"};
     json = cJSON_Parse((const char *)unzip_buf);
     if (!json)
     {
@@ -555,6 +561,71 @@ void Aiui::aiuiDataProc(unsigned char *buf, int len)
             }
             free(out);
         }
+
+        p = json;
+        for (i = 0; i < 4; i++)
+        {
+            p = cJSON_GetObjectItem(p, key_intent[i]);
+            if (!p)
+            {
+                break;
+            }
+        }
+        if (i == 4)
+        {
+            int semanticN = 0;
+            semanticN = cJSON_GetArraySize(p);
+            int m;
+            cJSON *l;
+            for (m = 0; m < semanticN; m++)
+            {
+                l = cJSON_GetArrayItem(p, m);
+                if (l)
+                {
+                    int slotN = 0;
+                    int j;
+                    vector<struct intent> intentSlot;
+                    struct intent temp;
+                    intentSlot.clear();
+                    slotN = cJSON_GetArraySize(p);
+                    cJSON *q;
+                    for (j = 0; j < slotN; j++)
+                    {
+                        q = cJSON_GetArrayItem(l, j);
+                        if (q)
+                        {
+                            cJSON *name, *normValue;
+                            name = cJSON_GetObjectItem(q, "name");
+                            if (name)
+                            {
+                                temp.name = cJSON_Print(q);
+                            }
+                            else
+                            {
+                                continue;
+                            }
+
+                            normValue = cJSON_GetObjectItem(q, "normValue");
+                            if (normValue)
+                            {
+                                temp.normValue = cJSON_Print(q);
+                            }
+                            else
+                            {
+                                continue;
+                            }
+
+                            intentSlot.push_back(temp);
+                        }
+                    }
+                    if (intentCB_ != NULL)
+                    {
+                        intentCB_(intentSlot);
+                    }
+                }
+            }
+        }
+
         p = cJSON_GetObjectItem(json, "type");
         if (p)
         {
