@@ -182,7 +182,6 @@ void Rosecho::intentCallback(vector<struct intent> slots)
     struct intent temp;
     int count = slots.size();
     int i;
-    printf("intent");
     for(i=0; i<count; i++)
     {
         temp = slots[i];

@@ -576,51 +576,57 @@ void Aiui::aiuiDataProc(unsigned char *buf, int len)
             int semanticN = 0;
             semanticN = cJSON_GetArraySize(p);
             int m;
-            cJSON *l;
+            cJSON *semantic;
             for (m = 0; m < semanticN; m++)
             {
-                l = cJSON_GetArrayItem(p, m);
-                if (l)
+                semantic = cJSON_GetArrayItem(p, m);
+                if (semantic)
                 {
-                    int slotN = 0;
-                    int j;
-                    vector<struct intent> intentSlot;
-                    struct intent temp;
-                    intentSlot.clear();
-                    slotN = cJSON_GetArraySize(p);
-                    cJSON *q;
-                    for (j = 0; j < slotN; j++)
+                    cJSON *slots;
+                    slots = cJSON_GetObjectItem(semantic, "slots");
+                    if(slots)
                     {
-                        q = cJSON_GetArrayItem(l, j);
-                        if (q)
+                        int slotN = 0;
+                        int j;
+                        vector<struct intent> intentSlot;
+                        struct intent temp;
+                        intentSlot.clear();
+                        slotN = cJSON_GetArraySize(slots);
+                        cJSON *slot;
+                        for (j = 0; j < slotN; j++)
                         {
-                            cJSON *name, *normValue;
-                            name = cJSON_GetObjectItem(q, "name");
-                            if (name)
+                            slot = cJSON_GetArrayItem(slots, j);
+                            if (slot)
                             {
-                                temp.name = cJSON_Print(q);
-                            }
-                            else
-                            {
-                                continue;
-                            }
+                                cJSON *name, *normValue;
+                                name = cJSON_GetObjectItem(slot, "name");
+                                if (name)
+                                {
+                                    temp.name = cJSON_Print(name);
+                                }
+                                else
+                                {
+                                    continue;
+                                }
 
-                            normValue = cJSON_GetObjectItem(q, "normValue");
-                            if (normValue)
-                            {
-                                temp.normValue = cJSON_Print(q);
+                                normValue = cJSON_GetObjectItem(slot, "normValue");
+                                if (normValue)
+                                {
+                                    temp.normValue = cJSON_Print(normValue);
+                                }
+                                else
+                                {
+                                    continue;
+                                }
+                                temp.name = temp.name.substr(1, temp.name.length()-2);
+                                temp.normValue = temp.normValue.substr(1, temp.normValue.length()-2);
+                                intentSlot.push_back(temp);
                             }
-                            else
-                            {
-                                continue;
-                            }
-
-                            intentSlot.push_back(temp);
                         }
-                    }
-                    if (intentCB_ != NULL)
-                    {
-                        intentCB_(intentSlot);
+                        if (intentCB_ != NULL)
+                        {
+                            intentCB_(intentSlot);
+                        }
                     }
                 }
             }
