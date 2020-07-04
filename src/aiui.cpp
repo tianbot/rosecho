@@ -278,6 +278,10 @@ void Aiui::cfg(const char *config)
     {
         cJSON_AddItemToObject(content, "msg_type", cJSON_CreateNumber(1));
     }
+    else if (strcmp("sleepDelay", config) == 0)
+    {
+        cJSON_AddItemToObject(content, "msg_type", cJSON_CreateNumber(20));
+    }
     cJSON_AddItemToObject(content, "arg1", cJSON_CreateNumber(0));
     cJSON_AddItemToObject(content, "arg2", cJSON_CreateNumber(0));
     cJSON_AddItemToObject(content, "params", cJSON_CreateString(""));
@@ -329,6 +333,11 @@ void Aiui::sleep(void)
 void Aiui::wakeup(void)
 {
     cfg("wakeup");
+}
+
+void Aiui::sleepDelay(void)
+{
+    cfg("sleepDelay");
 }
 
 void Aiui::ack(void)

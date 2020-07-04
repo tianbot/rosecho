@@ -85,6 +85,14 @@ protected:
 #else
 #error "No backend device defined"
 #endif
+
+private:
+#ifdef BACKEND_AIUI
+    void sleepDelay(void);
+    ros::Timer timer;
+#else
+#error "No backend device defined"
+#endif
 };
 
 class Rosecho

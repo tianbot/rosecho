@@ -34,6 +34,7 @@ public:
     void wakeup(void);
     void sleep(void);
     void wifiStatusCheck(void);
+    void sleepDelay(void);
     void tts(uint8_t flag, const char *str, const char *emot);
     void wifiCfg(const char *ssid, const char *password, uint8_t mode);
     void asrCallbackRegister(aiui_cb_str cb);
