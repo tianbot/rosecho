@@ -45,21 +45,30 @@ Rosecho_tts::Rosecho_tts(ros::NodeHandle nh_, std::string name, Aiui *p) : as_(n
 {
     backend_->ttsFinishCallbackRegister(boost::bind(&Rosecho_tts::ttsFinishCallback, this));
     backend_->ttsStartCallbackRegister(boost::bind(&Rosecho_tts::ttsStartCallback, this));
+    timer = nh_.createTimer(ros::Duration(3), boost::bind(&Rosecho_tts::sleepDelay, this));
     //register the goal and feeback callbacks
     as_.registerGoalCallback(boost::bind(&Rosecho_tts::goalCB, this));
     as_.registerPreemptCallback(boost::bind(&Rosecho_tts::preemptCB, this));
     as_.start();
 }
 
+void Rosecho_tts::sleepDelay(void)
+{
+    backend_->sleepDelay();
+}
+
 void Rosecho_tts::ttsStartCallback(void)
 {
     tts_result_.is_finished = false;
+    sleepDelay();
+    timer.start();
 }
 
 void Rosecho_tts::ttsFinishCallback(void)
 {
     tts_result_.is_finished = true;
     as_.setSucceeded(tts_result_);
+    timer.stop();
 }
 
 void Rosecho_tts::goalCB()

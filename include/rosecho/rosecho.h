@@ -69,6 +69,7 @@ class Rosecho_tts
 public:
 #ifdef BACKEND_AIUI
     Rosecho_tts(ros::NodeHandle nh_, std::string name, Aiui *p);
+    ros::Timer timer;
 #else
 #error "No backend device defined"
 #endif
@@ -86,6 +87,8 @@ protected:
 #else
 #error "No backend device defined"
 #endif
+private:
+    void sleepDelay(void);
 };
 
 class Rosecho
