@@ -23,11 +23,10 @@ class RosEchoNav():
         
     def asr_callback(self, data):
         ros_msg = data.data.strip('"')
-        cmd = u"去端茶"
         if not isinstance(ros_msg, unicode):
             ros_msg = unicode(ros_msg, "utf8")
 
-        if cmd == ros_msg:
+        if ros_msg == u"去端茶":
             self.rosecho_tts.cancel_goal()
 
             text = ttsGoal()
