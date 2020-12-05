@@ -43,6 +43,12 @@ Rosecho_tts::Rosecho_tts(ros::NodeHandle nh_, std::string name, Aiui *p) : as_(n
 #error "No backend device defined"
 #endif
 {
+#ifdef BACKEND_AIUI
+    timer = nh_.createTimer(ros::Duration(3), boost::bind(&Rosecho_tts::sleepDelay, this));
+    timer.stop();
+#else
+#error "No backend device defined"
+#endif
     backend_->ttsFinishCallbackRegister(boost::bind(&Rosecho_tts::ttsFinishCallback, this));
     backend_->ttsStartCallbackRegister(boost::bind(&Rosecho_tts::ttsStartCallback, this));
     //register the goal and feeback callbacks
@@ -51,15 +57,27 @@ Rosecho_tts::Rosecho_tts(ros::NodeHandle nh_, std::string name, Aiui *p) : as_(n
     as_.start();
 }
 
+#ifdef BACKEND_AIUI
+void Rosecho_tts::sleepDelay(void)
+#else
+#error "No backend device defined"
+#endif
+{
+    backend_->sleepDelay();
+}
+
 void Rosecho_tts::ttsStartCallback(void)
 {
     tts_result_.is_finished = false;
+    sleepDelay();
+    timer.start();
 }
 
 void Rosecho_tts::ttsFinishCallback(void)
 {
     tts_result_.is_finished = true;
     as_.setSucceeded(tts_result_);
+    timer.stop();
 }
 
 void Rosecho_tts::goalCB()
