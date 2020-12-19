@@ -5,6 +5,7 @@
 #include "gzip.h"
 #include "serial.h"
 #include <vector>
+#include <string>
 #include "boost/bind.hpp"
 #include "boost/function.hpp"
 
@@ -37,6 +38,7 @@ public:
     void sleepDelay(void);
     void tts(uint8_t flag, const char *str, const char *emot);
     void wifiCfg(const char *ssid, const char *password, uint8_t mode);
+    void localIntentCfg(string bnf);
     void asrCallbackRegister(aiui_cb_str cb);
     void answerCallbackRegister(aiui_cb_str cb);
     void ttsStartCallbackRegister(aiui_cb_noparam cb);
@@ -45,6 +47,7 @@ public:
     void wakeCallbackRegister(aiui_cb_int cb);
     void wifiDisconnectCallbackRegister(aiui_cb_noparam cb);
     void wifiConnectCallbackRegister(aiui_cb_str cb);
+    void localIntentCfgCallbackRegister(aiui_cb_int cb);
     Aiui(string serial_port);
 
 private:
@@ -61,6 +64,7 @@ private:
     aiui_cb_noparam ttsFinishCB_;
     aiui_cb_noparam sleepCB_;
     aiui_cb_int wakeCB_;
+    aiui_cb_int localIntentCfgCB_;
     aiui_cb_noparam wifiDisconnectCB_;
     aiui_cb_str wifiConnectCB_;
 };

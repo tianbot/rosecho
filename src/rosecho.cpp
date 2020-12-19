@@ -93,7 +93,7 @@ void Rosecho_tts::preemptCB()
     as_.setPreempted();
 }
 
-Rosecho::Rosecho(ros::NodeHandle *nh):nh_(*nh)
+Rosecho::Rosecho(ros::NodeHandle *nh) : nh_(*nh)
 {
     std::string param_serial_port;
     //nh_ = ros::NodeHandle("rosecho");
@@ -110,6 +110,7 @@ Rosecho::Rosecho(ros::NodeHandle *nh):nh_(*nh)
     disableService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("disable", boost::bind(&Rosecho::disable, this, _1, _2));
     sleepService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("sleep", boost::bind(&Rosecho::sleep, this, _1, _2));
     wakeupService_ = nh_.advertiseService<std_srvs::Empty::Request, std_srvs::Empty::Response>("wakeup", boost::bind(&Rosecho::wakeup, this, _1, _2));
+    localIntentService_ = nh_.advertiseService<rosecho::LocalIntent::Request, rosecho::LocalIntent::Response>("local_intent", boost::bind(&Rosecho::localIntentCfg, this, _1, _2));
 #ifdef BACKEND_AIUI
     backend_ = new Aiui(param_serial_port);
 #else
@@ -121,7 +122,7 @@ Rosecho::Rosecho(ros::NodeHandle *nh):nh_(*nh)
     backend_->wakeCallbackRegister(boost::bind(&Rosecho::wakeCallback, this, _1));
     backend_->wifiConnectCallbackRegister(boost::bind(&Rosecho::wifiConnectCallback, this, _1));
     backend_->wifiDisconnectCallbackRegister(boost::bind(&Rosecho::wifiDisconnectCallback, this));
-
+    backend_->localIntentCfgCallbackRegister(boost::bind(&Rosecho::localIntentCfgCallback, this, _1));
     rosecho_tts_ = new Rosecho_tts(nh_, "tts", backend_);
 }
 
@@ -144,7 +145,7 @@ bool Rosecho::wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response
     res.connected = isWifiConnected_;
     if (res.connected)
     {
-        res.ssid = ssid_.substr(1, ssid_.length()-2);//replace head and tail "
+        res.ssid = ssid_.substr(1, ssid_.length() - 2); //replace head and tail "
     }
     else
     {
@@ -154,28 +155,61 @@ bool Rosecho::wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response
     return true;
 }
 
-bool Rosecho::enable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
+bool Rosecho::enable(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
 {
     backend_->enable();
-    ros::Duration(1).sleep();//wait backend ready
+    ros::Duration(1).sleep(); //wait backend ready
     return true;
 }
 
-bool Rosecho::disable(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
+bool Rosecho::disable(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
 {
     backend_->disable();
     return true;
 }
 
-bool Rosecho::wakeup(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
+bool Rosecho::wakeup(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
 {
     backend_->wakeup();
     return true;
 }
 
-bool Rosecho::sleep(std_srvs::Empty::Request &req,  std_srvs::Empty::Response &res)
+bool Rosecho::sleep(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
 {
     backend_->sleep();
+    return true;
+}
+
+bool Rosecho::localIntentCfg(rosecho::LocalIntent::Request &req, rosecho::LocalIntent::Response &res)
+{
+    int i = 0;
+    int count = 10;
+    res.status = -1;
+    string bnf;
+    FILE *fp = fopen(req.bnf.c_str(), "rb");
+    if (fp == NULL)
+    {
+        ROS_ERROR("bnf file not existed");
+        return false;
+    }
+    while (1)
+    {
+        fread(&bnf[i], 1, 1, fp);
+        if (feof(fp))
+        {
+            break;
+        }
+    }
+    localIntentCfgReturnFlag_ = false;
+    backend_->localIntentCfg(bnf);
+    do
+    {
+        ros::Duration(0.1).sleep();
+    } while (!localIntentCfgReturnFlag_ && count--);
+    if(localIntentCfgReturnFlag_)
+    {
+        res.status = localIntentCfgResult_;
+    }
     return true;
 }
 
@@ -211,4 +245,10 @@ void Rosecho::wifiDisconnectCallback(void)
 {
     //ROS_INFO("Wifi disconnect");
     isWifiConnected_ = false;
+}
+
+void Rosecho::localIntentCfgCallback(int res)
+{
+    localIntentCfgResult_ = res;
+    localIntentCfgReturnFlag_ = true;
 }

@@ -59,6 +59,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_service_files(
   FILES
   WifiCfg.srv
+  LocalIntent.srv
 #   Service2.srv
  )
 

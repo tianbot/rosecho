@@ -14,6 +14,7 @@ Aiui::Aiui(string serial_port)
     wakeCB_ = NULL;
     wifiConnectCB_ = NULL;
     wifiDisconnectCB_ = NULL;
+    localIntentCfgCB_ = NULL;
     isAnswerFlag_ = false;
     if (serial_.open(serial_port.c_str(), 115200, 0, 8, 1, 'N',
                      boost::bind(&Aiui::serialDataProc, this, _1, _2)) != true)
@@ -62,6 +63,11 @@ void Aiui::wifiDisconnectCallbackRegister(aiui_cb_noparam cb)
 void Aiui::wifiConnectCallbackRegister(aiui_cb_str cb)
 {
     wifiConnectCB_ = cb;
+}
+
+void Aiui::localIntentCfgCallbackRegister(aiui_cb_int cb)
+{
+    localIntentCfgCB_ = cb;
 }
 
 void Aiui::tts(uint8_t flag, const char *str, const char *emot)
@@ -338,6 +344,63 @@ void Aiui::wakeup(void)
 void Aiui::sleepDelay(void)
 {
     cfg("sleepDelay");
+}
+
+void Aiui::localIntentCfg(string bnf)
+{
+    cJSON *root, *content;
+    uint16_t len;
+    vector<uint8_t> buf;
+    char *out;
+
+    uint8_t checksum = 0;
+
+    int i;
+
+    id_++;
+
+    buf.push_back(0xA5);
+    buf.push_back(0x01);
+
+    buf.push_back(0x05);
+
+    root = cJSON_CreateObject();
+
+    cJSON_AddItemToObject(root, "type", cJSON_CreateString("aiui_msg"));
+    cJSON_AddItemToObject(root, "content", content = cJSON_CreateObject());
+    cJSON_AddItemToObject(content, "msg_type", cJSON_CreateNumber(16));
+   
+    cJSON_AddItemToObject(content, "arg1", cJSON_CreateNumber(0));
+    cJSON_AddItemToObject(content, "arg2", cJSON_CreateNumber(0));
+    cJSON_AddItemToObject(content, "params", cJSON_CreateString(bnf.c_str()));
+
+    out = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    len = strlen(out);
+
+    buf.push_back(len & 0xFF);
+    buf.push_back((len >> 8) & 0xFF);
+
+    buf.push_back(id_ & 0xFF);
+    buf.push_back((id_ >> 8) & 0xFF);
+
+    for (i = 0; i < len; i++)
+    {
+        buf.push_back(out[i]);
+    }
+
+    free(out);
+
+    for (i = 0; i < buf.size(); i++)
+    {
+        checksum += buf[i];
+    }
+    checksum = (~checksum) + 1;
+
+    buf.push_back(checksum);
+
+    serial_.send(&buf[0], buf.size());
+    buf.clear();
 }
 
 void Aiui::ack(void)
@@ -622,6 +685,24 @@ void Aiui::aiuiDataProc(unsigned char *buf, int len)
                                     if (wakeCB_ != NULL)
                                     {
                                         wakeCB_(360 - q->valueint);
+                                    }
+                                }
+                            }
+                        }
+                        else if(q->valueint == 8) // event cmd return
+                        {
+                            q = cJSON_GetObjectItem(p, "arg1");
+                            if (q)
+                            {
+                                if (q->valueint == 16)
+                                {
+                                    q = cJSON_GetObjectItem(p, "arg2");
+                                    if(q)
+                                    {
+                                        if (localIntentCfgCB_ != NULL)
+                                        {
+                                            localIntentCfgCB_(q->valueint);
+                                        }
                                     }
                                 }
                             }

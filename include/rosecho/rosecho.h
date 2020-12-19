@@ -42,9 +42,11 @@
 #include "actionlib/server/simple_action_server.h"
 #include "rosecho/WifiCfg.h"
 #include "std_srvs/Empty.h"
+#include "rosecho/LocalIntent.h"
 #include "stdint.h"
 
 using namespace std;
+using namespace boost;
 
 #define BACKEND_AIUI
 
@@ -117,18 +119,23 @@ private:
     ros::ServiceServer disableService_;
     ros::ServiceServer sleepService_;
     ros::ServiceServer wakeupService_;
+    ros::ServiceServer localIntentService_;
     void answerCallback(string str);
     void asrCallback(string str);
     void wakeCallback(int angle);
     void wifiConnectCallback(string str);
     void wifiDisconnectCallback(void);
+    void localIntentCfgCallback(int res);
     bool wifiCfg(rosecho::WifiCfg::Request &req, rosecho::WifiCfg::Response &res);
     bool enable(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
     bool disable(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
     bool wakeup(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
     bool sleep(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+    bool localIntentCfg(rosecho::LocalIntent::Request &req, rosecho::LocalIntent::Response &res);
 
     bool isWifiConnected_;
+    int localIntentCfgResult_;
+    bool localIntentCfgReturnFlag_;
     std::string ssid_;
 };
 
