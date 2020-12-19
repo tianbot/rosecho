@@ -200,6 +200,7 @@ bool Rosecho::localIntentCfg(rosecho::LocalIntent::Request &req, rosecho::LocalI
             break;
         }
     }
+    fclose(fp);
     localIntentCfgReturnFlag_ = false;
     backend_->localIntentCfg(bnf);
     do
