@@ -5,4 +5,7 @@
   <node pkg="rosecho" type="rosecho_node" name="rosecho" output="screen">
     <param name="serial_port" type="string" value="$(arg serial_port)"/>
   </node>
+
+  <node pkg="rosecho" type="asr_echo.py" name="asr_echo" output="screen" />
+  <node pkg="rosecho" type="answer_echo.py" name="answer_echo" output="screen" />
 </launch>
